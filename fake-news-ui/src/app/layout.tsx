@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AppProvider } from "@/context/AppContext";
+import { AppModals } from "@/components/AppModals";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Fake News Detector | NLP & ML Dashboard",
-  description: "Real-time Machine Learning and NLP Fake News Detection System powered by PassiveAggressive Classifier and FastAPI.",
+  title: "VERITAS AI // Disinformation Intelligence & Truth Console",
+  description: "Enterprise-grade real-time NLP disinformation detection platform powered by PassiveAggressive Machine Learning and PostgreSQL Raw SQL telemetry.",
 };
 
 export default function RootLayout({
@@ -23,9 +25,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark antialiased`}>
-      <body className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 selection:text-indigo-200">
-        {children}
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark antialiased`} suppressHydrationWarning>
+      <body className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-indigo-500/20 selection:text-indigo-900 dark:selection:bg-indigo-500/30 dark:selection:text-indigo-200 transition-colors duration-200 font-sans">
+        <AppProvider>
+          {children}
+          <AppModals />
+        </AppProvider>
       </body>
     </html>
   );

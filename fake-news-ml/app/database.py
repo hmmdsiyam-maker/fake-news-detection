@@ -96,6 +96,29 @@ def init_db():
             ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'active';
         """)
 
+        # Create blog_posts table with Raw SQL
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS blog_posts (
+                id SERIAL PRIMARY KEY,
+                slug VARCHAR(255) UNIQUE NOT NULL,
+                title VARCHAR(512) NOT NULL,
+                excerpt TEXT NOT NULL,
+                category VARCHAR(64) NOT NULL DEFAULT 'AI Research',
+                author_name VARCHAR(128) NOT NULL DEFAULT 'Veritas Research Team',
+                author_role VARCHAR(128) NOT NULL DEFAULT 'Lead Researcher',
+                author_avatar TEXT NOT NULL DEFAULT '',
+                date VARCHAR(64) NOT NULL DEFAULT '',
+                read_time VARCHAR(64) NOT NULL DEFAULT '5 min read',
+                tags TEXT NOT NULL DEFAULT '',
+                featured BOOLEAN NOT NULL DEFAULT FALSE,
+                content TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug);
+            CREATE INDEX IF NOT EXISTS idx_blog_created ON blog_posts(created_at DESC);
+        """)
+
         conn.commit()
 
     conn.close()
@@ -209,17 +232,32 @@ def raw_save_history(user_id: int | None, headline: str, content_preview: str,
             conn.commit()
             return record
 
-def raw_get_user_history(user_id: int, limit: int = 50, offset: int = 0):
-    query = """
+def raw_get_user_history(user_id: int, search: str = None, verdict: str = None, limit: int = 50, offset: int = 0):
+    conditions = ["user_id = %s"]
+    params = [user_id]
+
+    if search and search.strip():
+        conditions.append("(LOWER(headline) LIKE %s OR LOWER(content_preview) LIKE %s)")
+        term = f"%{search.strip().lower()}%"
+        params.extend([term, term])
+
+    if verdict and verdict.strip() and verdict.lower() != "all":
+        conditions.append("LOWER(prediction) = %s")
+        params.append(verdict.strip().lower())
+
+    where_clause = " AND ".join(conditions)
+    query = f"""
         SELECT id, headline, content_preview, prediction, label, confidence, latency_ms, created_at
         FROM prediction_history
-        WHERE user_id = %s
+        WHERE {where_clause}
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s;
     """
+    params.extend([limit, offset])
+
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (user_id, limit, offset))
+            cur.execute(query, tuple(params))
             return cur.fetchall()
 
 def raw_delete_history_item(history_id: int, user_id: int):
@@ -277,29 +315,62 @@ def raw_get_admin_stats():
                 "active_today": active_res["active_today"]
             }
 
-def raw_get_admin_users():
-    query = """
+def raw_get_admin_users(search: str = None, role: str = None, tier: str = None):
+    conditions = []
+    params = []
+
+    if search and search.strip():
+        conditions.append("(LOWER(u.username) LIKE %s OR LOWER(u.email) LIKE %s)")
+        term = f"%{search.strip().lower()}%"
+        params.extend([term, term])
+
+    if role and role.strip() and role.lower() != "all":
+        conditions.append("u.role = %s")
+        params.append(role.strip().lower())
+
+    if tier and tier.strip() and tier.lower() != "all":
+        conditions.append("u.subscription_tier = %s")
+        params.append(tier.strip().lower())
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    query = f"""
         SELECT 
             u.id, 
             u.username, 
             u.email, 
             u.role, 
-            u.subscription_tier,
+            u.subscription_tier, 
             u.created_at, 
             u.last_login,
             COUNT(h.id) AS prediction_count
         FROM users u
         LEFT JOIN prediction_history h ON u.id = h.user_id
+        {where_clause}
         GROUP BY u.id
         ORDER BY u.created_at DESC;
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query)
+            cur.execute(query, tuple(params))
             return cur.fetchall()
 
-def raw_get_admin_global_history(limit: int = 100):
-    query = """
+def raw_get_admin_global_history(search: str = None, verdict: str = None, limit: int = 100, offset: int = 0):
+    conditions = []
+    params = []
+
+    if search and search.strip():
+        conditions.append("(LOWER(h.headline) LIKE %s OR LOWER(u.username) LIKE %s OR LOWER(u.email) LIKE %s)")
+        term = f"%{search.strip().lower()}%"
+        params.extend([term, term, term])
+
+    if verdict and verdict.strip() and verdict.lower() != "all":
+        conditions.append("LOWER(h.prediction) = %s")
+        params.append(verdict.strip().lower())
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    query = f"""
         SELECT 
             h.id, 
             h.headline, 
@@ -313,12 +384,15 @@ def raw_get_admin_global_history(limit: int = 100):
             u.email
         FROM prediction_history h
         LEFT JOIN users u ON h.user_id = u.id
+        {where_clause}
         ORDER BY h.created_at DESC
-        LIMIT %s;
+        LIMIT %s OFFSET %s;
     """
+    params.extend([limit, offset])
+
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (limit,))
+            cur.execute(query, tuple(params))
             return cur.fetchall()
 
 def raw_delete_user_by_admin(user_id: int):
@@ -329,3 +403,204 @@ def raw_delete_user_by_admin(user_id: int):
             res = cur.fetchone()
             conn.commit()
             return res is not None
+
+# ==============================================================================
+# BLOG RAW SQL CRUD OPERATIONS
+# ==============================================================================
+
+def raw_get_all_blogs(search: str = None, category: str = None):
+    where_clauses = []
+    params = []
+    if search:
+        where_clauses.append("(title ILIKE %s OR excerpt ILIKE %s OR tags ILIKE %s)")
+        like_term = f"%{search}%"
+        params.extend([like_term, like_term, like_term])
+    if category and category != "All":
+        where_clauses.append("category = %s")
+        params.append(category)
+
+    where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    query = f"""
+        SELECT id, slug, title, excerpt, category, author_name, author_role, author_avatar,
+               date, read_time, tags, featured, content, created_at, updated_at
+        FROM blog_posts
+        {where_str}
+        ORDER BY featured DESC, created_at DESC;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, tuple(params))
+            return cur.fetchall()
+
+def raw_get_blog_by_slug(slug: str):
+    query = """
+        SELECT id, slug, title, excerpt, category, author_name, author_role, author_avatar,
+               date, read_time, tags, featured, content, created_at, updated_at
+        FROM blog_posts
+        WHERE slug = %s;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (slug,))
+            return cur.fetchone()
+
+def raw_get_blog_by_id(blog_id: int):
+    query = """
+        SELECT id, slug, title, excerpt, category, author_name, author_role, author_avatar,
+               date, read_time, tags, featured, content, created_at, updated_at
+        FROM blog_posts
+        WHERE id = %s;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (blog_id,))
+            return cur.fetchone()
+
+def raw_create_blog(
+    slug: str,
+    title: str,
+    excerpt: str,
+    content: str,
+    category: str = "AI Research",
+    author_name: str = "Veritas Research Team",
+    author_role: str = "Lead Researcher",
+    author_avatar: str = "",
+    date: str = "",
+    read_time: str = "5 min read",
+    tags: str = "",
+    featured: bool = False
+):
+    query = """
+        INSERT INTO blog_posts (
+            slug, title, excerpt, content, category, author_name, author_role,
+            author_avatar, date, read_time, tags, featured
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id, slug, title, excerpt, category, author_name, author_role, author_avatar,
+                  date, read_time, tags, featured, content, created_at;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (
+                slug, title, excerpt, content, category, author_name, author_role,
+                author_avatar, date, read_time, tags, featured
+            ))
+            blog = cur.fetchone()
+            conn.commit()
+            return blog
+
+def raw_update_blog(
+    blog_id: int,
+    slug: str,
+    title: str,
+    excerpt: str,
+    content: str,
+    category: str = "AI Research",
+    author_name: str = "Veritas Research Team",
+    author_role: str = "Lead Researcher",
+    author_avatar: str = "",
+    date: str = "",
+    read_time: str = "5 min read",
+    tags: str = "",
+    featured: bool = False
+):
+    query = """
+        UPDATE blog_posts
+        SET slug = %s, title = %s, excerpt = %s, content = %s, category = %s,
+            author_name = %s, author_role = %s, author_avatar = %s, date = %s,
+            read_time = %s, tags = %s, featured = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+        RETURNING id, slug, title, excerpt, category, author_name, author_role, author_avatar,
+                  date, read_time, tags, featured, content, created_at, updated_at;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (
+                slug, title, excerpt, content, category, author_name, author_role,
+                author_avatar, date, read_time, tags, featured, blog_id
+            ))
+            blog = cur.fetchone()
+            conn.commit()
+            return blog
+
+def raw_delete_blog(blog_id: int) -> bool:
+    query = "DELETE FROM blog_posts WHERE id = %s RETURNING id;"
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (blog_id,))
+            res = cur.fetchone()
+            conn.commit()
+            return res is not None
+
+def seed_default_blogs():
+    """Seed initial authoritative blog posts if table is empty."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) as cnt FROM blog_posts;")
+            row = cur.fetchone()
+            if row and row["cnt"] > 0:
+                return
+
+    print("[*] Seeding default research blog posts into PostgreSQL...")
+    initial_posts = [
+        {
+            "slug": "reverse-engineering-clickbait-passive-aggressive-nlp",
+            "title": "Reverse-Engineering Clickbait: How PassiveAggressive NLP Dissects Synthetic Headlines in 40ms",
+            "excerpt": "An empirical deep dive into why classical margin-based classifiers combined with N-gram TF-IDF vectorizers outperform multi-billion parameter LLMs in high-throughput newsrooms.",
+            "category": "AI Research",
+            "author_name": "Dr. Elena Rostova",
+            "author_role": "Lead NLP Research Scientist",
+            "author_avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+            "date": "September 22, 2026",
+            "read_time": "7 min read",
+            "tags": "NLP,Machine Learning,PassiveAggressive,TF-IDF",
+            "featured": True,
+            "content": "## The Latency Paradox in Real-Time Verification\n\nIn fast-paced editorial rooms and automated content moderation pipelines, decision latency is paramount. While Large Language Models (LLMs) such as GPT-4 and Claude offer remarkable reasoning depth, their inference latencies typically oscillate between 800ms and 3,500ms.\n\nOur research benchmark shows that PassiveAggressive Classifiers paired with lemmatized TF-IDF feature projections yield sub-50ms inference times while maintaining over 98.4% empirical classification accuracy on structured news corpora."
+        },
+        {
+            "slug": "the-anatomy-of-election-disinformation-campaigns",
+            "title": "The Anatomy of Synthetic Influence: Deconstructing 500,000 Coordinated Disinformation Vectors",
+            "excerpt": "A comprehensive investigation into automated botnets, cross-platform narrative laundering, and how real-time semantic audits can prevent algorithmic panic.",
+            "category": "OSINT",
+            "author_name": "Marcus Vance",
+            "author_role": "OSINT Director & Former Reuters Bureau Chief",
+            "author_avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
+            "date": "September 18, 2026",
+            "read_time": "9 min read",
+            "tags": "Disinformation,OSINT,Elections,Cybersecurity",
+            "featured": False,
+            "content": "## Narrative Laundering: From Dark Web to Mainstream Feeds\n\nModern disinformation operations rarely begin on front-page websites. Instead, state-aligned influence groups deploy narrative laundering cycles:\n\n1. Seed Phase: Obscure web forums publish fabricated claims.\n2. Amplification Phase: Coordinated autonomous bot swarms push trending hashtags.\n3. Legitimization Phase: Aggregator blogs cite the trending topics without verifying sources.\n4. Mainstream Infiltration: Major newsdesks report on the 'public debate' sparked by the fabrication."
+        },
+        {
+            "slug": "raw-sql-vs-orm-scaling-audit-trails",
+            "title": "Why Veritas Chose Pure Raw SQL Over Heavy ORMs for Production Audit Trails",
+            "excerpt": "Engineering retrospective: achieving 10x query throughput and zero-overhead parameterized telemetry using native PostgreSQL drivers.",
+            "category": "Methodology",
+            "author_name": "Tariq Rahman",
+            "author_role": "Principal Infrastructure Architect",
+            "author_avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+            "date": "September 12, 2026",
+            "read_time": "6 min read",
+            "tags": "PostgreSQL,Database Architecture,Raw SQL,Performance",
+            "featured": False,
+            "content": "## The Cost of ORM Abstractions in High-Write Telemetry\n\nWhen designing the Veritas verification audit trail, our system requirements demanded sub-5ms insertion latency per analyzed article and complex parameterized filtering over millions of audit logs without hidden lazy-loading traps."
+        }
+    ]
+
+    for p in initial_posts:
+        raw_create_blog(
+            slug=p["slug"],
+            title=p["title"],
+            excerpt=p["excerpt"],
+            content=p["content"],
+            category=p["category"],
+            author_name=p["author_name"],
+            author_role=p["author_role"],
+            author_avatar=p["author_avatar"],
+            date=p["date"],
+            read_time=p["read_time"],
+            tags=p["tags"],
+            featured=p["featured"]
+        )
+    print("[+] Default research blog posts seeded successfully.")
+
