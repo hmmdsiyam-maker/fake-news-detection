@@ -43,7 +43,7 @@ export default function ConsolePage() {
   React.useEffect(() => {
     if (pendingHistoryLoad) {
       setTitle(pendingHistoryLoad.headline || "");
-      setText(pendingHistoryLoad.content || "");
+      setText(pendingHistoryLoad.content_preview || "");
       setResult(null); // Clear previous results
       setLatency(null);
       setErrorMsg(null);
