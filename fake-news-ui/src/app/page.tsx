@@ -5,54 +5,109 @@ import {
   ShieldCheck,
   AlertTriangle,
   Sparkles,
-  Zap,
-  BarChart3,
   RefreshCw,
   Copy,
   Check,
   ArrowRight,
-  Database,
-  Cpu,
+  RotateCcw,
+  Gauge,
   Activity,
-  Layers,
   FileText,
+  Sun,
+  Moon,
+  User,
+  LogIn,
+  LogOut,
+  History,
+  Trash2,
+  Lock,
+  Mail,
+  Shield,
+  Clock,
+  X,
+  Database,
+  BarChart3,
   Search,
-  BookOpen,
-  Info
+  ExternalLink,
+  Key
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
 interface PredictionResult {
   prediction: "Fake News" | "Real News";
-  label: number;
+  label: number; // 0 = Real, 1 = Fake
   confidence: number;
+  latency_ms?: number;
+  saved_to_history?: boolean;
+  guest_remaining?: number | null;
   status: string;
 }
 
-const SAMPLE_PRESETS = {
-  real1: {
-    name: "Real News: Senate Bill",
+interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+}
+
+interface HistoryItem {
+  id: number;
+  headline: string;
+  content_preview: string;
+  prediction: string;
+  label: number;
+  confidence: number;
+  latency_ms: number;
+  created_at: string;
+}
+
+interface AdminStats {
+  total_users: number;
+  total_predictions: number;
+  real_predictions: number;
+  fake_predictions: number;
+  avg_confidence: number;
+  avg_latency: number;
+  active_today: number;
+}
+
+interface AdminUserItem {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  created_at: string;
+  last_login: string | null;
+  prediction_count: number;
+}
+
+interface AdminGlobalLog {
+  id: number;
+  headline: string;
+  prediction: string;
+  confidence: number;
+  latency_ms: number;
+  created_at: string;
+  username: string | null;
+  email: string | null;
+}
+
+const PRESETS = {
+  real: {
     title: "US Senate passes bipartisan funding bill to prevent government shutdown",
-    text: "WASHINGTON (Reuters) - The United States Senate overwhelmingly approved a bipartisan funding package on Thursday, sending the legislation to the president for signing into law. The measure funds key government agencies through the remainder of the fiscal year, avoiding a disruptive partial shutdown of federal operations."
+    text: "WASHINGTON (Reuters) - The United States Senate overwhelmingly approved a bipartisan funding package on Thursday, sending the legislation to the president for signing into law. The measure funds key government agencies through the remainder of the fiscal year, avoiding a disruptive partial shutdown of federal operations across the country."
   },
-  real2: {
-    name: "Real News: NASA Science",
-    title: "NASA James Webb Space Telescope confirms atmosphere details on exoplanet",
-    text: "HOUSTON (AP) - Astronomers analyzing transmission spectroscopy data from the James Webb Space Telescope have identified molecular signatures including carbon dioxide and water vapor in the upper atmosphere of a distant gas giant, marking a major milestone in exoplanetary characterization."
-  },
-  fake1: {
-    name: "Fake News: Alien Plot",
+  fake: {
     title: "SHOCKING SECRET: Alien DNA Found in Water Supplies Across the World!",
-    text: "Undercover whistleblowers reveal that global elites have introduced secret alien bio-technology into city water networks to hypnotize the general population and control human thoughts via satellite frequency towers! Share before this gets taken down!"
-  },
-  fake2: {
-    name: "Fake News: Miracle Cure",
-    title: "Doctors STUNNED: Backyard weed completely cures all diseases in 48 hours",
-    text: "Big pharma executives are in a panic after a rogue botanist uncovered an ancient herbal plant growing in suburban gardens that eradicates all human illness instantly. The medical establishment is scrambling to ban this miracle cure immediately."
+    text: "Undercover whistleblowers reveal that global elites have introduced secret alien bio-technology into city water networks to hypnotize the general population and control human thoughts via satellite frequency towers! Share before this gets taken down immediately by authorities!"
   }
 };
 
+const API_BASE = "http://127.0.0.1:8000";
+const GUEST_USAGE_LIMIT = 5;
+
 export default function FakeNewsDetectorPage() {
+  const [theme, setTheme] = useState<"white" | "dark">("white");
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,10 +117,119 @@ export default function FakeNewsDetectorPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Guest Usage Tracker (Max 5 for non-login users)
+  const [guestCount, setGuestCount] = useState<number>(0);
+
+  // User & Auth State
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authUsername, setAuthUsername] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // User History State
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [userHistory, setUserHistory] = useState<HistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyCount, setHistoryCount] = useState<number>(0);
+
+  // Admin Telemetry State
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  const [adminUsers, setAdminUsers] = useState<AdminUserItem[]>([]);
+  const [adminLogs, setAdminLogs] = useState<AdminGlobalLog[]>([]);
+  const [adminTab, setAdminTab] = useState<"stats" | "users" | "logs">("stats");
+  const [adminLoading, setAdminLoading] = useState(false);
+
+  // Sync theme with body class and localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("truth-console-theme") as "white" | "dark" | null;
+    if (saved === "dark" || saved === "white") {
+      setTheme(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.remove("theme-white", "theme-dark");
+    document.body.classList.add(theme === "dark" ? "theme-dark" : "theme-white");
+    localStorage.setItem("truth-console-theme", theme);
+  }, [theme]);
+
+  // Load Auth Token & Guest Count from localStorage on mount
+  useEffect(() => {
+    const savedGuest = localStorage.getItem("truth-console-guest-count");
+    if (savedGuest) {
+      setGuestCount(parseInt(savedGuest, 10) || 0);
+    }
+
+    const savedToken = localStorage.getItem("truth-console-token");
+    const savedUser = localStorage.getItem("truth-console-user");
+    if (savedToken && savedUser) {
+      try {
+        setToken(savedToken);
+        setCurrentUser(JSON.parse(savedUser));
+        // Verify with /me
+        fetch(`${API_BASE}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${savedToken}` }
+        })
+          .then((res) => {
+            if (res.ok) return res.json();
+            throw new Error("Token invalid");
+          })
+          .then((userData) => {
+            setCurrentUser(userData);
+            localStorage.setItem("truth-console-user", JSON.stringify(userData));
+          })
+          .catch(() => {
+            setToken(null);
+            setCurrentUser(null);
+            localStorage.removeItem("truth-console-token");
+            localStorage.removeItem("truth-console-user");
+          });
+      } catch {
+        // ignore parse error
+      }
+    }
+  }, []);
+
+  // Fetch user history count
+  const fetchUserHistory = useCallback(async () => {
+    if (!token) {
+      setUserHistory([]);
+      setHistoryCount(0);
+      return;
+    }
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/history?limit=100`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserHistory(data.history || []);
+        setHistoryCount(data.count || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch history:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchUserHistory();
+    }
+  }, [token, fetchUserHistory]);
+
   // Check Backend Health
   const checkHealth = useCallback(async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/health", { method: "GET" });
+      const res = await fetch(`${API_BASE}/health`, { method: "GET" });
       if (res.ok) {
         const data = await res.json();
         setApiOnline(data.status === "healthy");
@@ -83,12 +247,173 @@ export default function FakeNewsDetectorPage() {
     return () => clearInterval(interval);
   }, [checkHealth]);
 
-  // Handle Analysis
+  // Handle Login / Registration
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthLoading(true);
+
+    try {
+      if (authMode === "login") {
+        const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username_or_email: authUsername,
+            password: authPassword
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Login failed");
+
+        setToken(data.token);
+        setCurrentUser(data.user);
+        localStorage.setItem("truth-console-token", data.token);
+        localStorage.setItem("truth-console-user", JSON.stringify(data.user));
+        setAuthModalOpen(false);
+        setAuthUsername("");
+        setAuthPassword("");
+        setErrorMsg(null);
+      } else {
+        const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: authUsername,
+            email: authEmail,
+            password: authPassword
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Registration failed");
+
+        setToken(data.token);
+        setCurrentUser(data.user);
+        localStorage.setItem("truth-console-token", data.token);
+        localStorage.setItem("truth-console-user", JSON.stringify(data.user));
+        setAuthModalOpen(false);
+        setAuthUsername("");
+        setAuthEmail("");
+        setAuthPassword("");
+        setErrorMsg(null);
+      }
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : "Authentication error");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken(null);
+    setCurrentUser(null);
+    setUserHistory([]);
+    setHistoryCount(0);
+    localStorage.removeItem("truth-console-token");
+    localStorage.removeItem("truth-console-user");
+  };
+
+  // Delete history item
+  const handleDeleteHistoryItem = async (id: number) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/history/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setUserHistory((prev) => prev.filter((item) => item.id !== id));
+        setHistoryCount((prev) => Math.max(prev - 1, 0));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Clear all history
+  const handleClearAllHistory = async () => {
+    if (!token || !confirm("Clear all your search history? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/history`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setUserHistory([]);
+        setHistoryCount(0);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Restore history record to console input
+  const restoreHistoryItem = (item: HistoryItem) => {
+    setTitle(item.headline);
+    setText(item.content_preview);
+    setHistoryModalOpen(false);
+    setResult(null);
+  };
+
+  // Fetch Admin Data
+  const fetchAdminData = async () => {
+    if (!token || currentUser?.role !== "admin") return;
+    setAdminLoading(true);
+    try {
+      const [resStats, resUsers, resLogs] = await Promise.all([
+        fetch(`${API_BASE}/api/v1/admin/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE}/api/v1/admin/users`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE}/api/v1/admin/history?limit=100`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      if (resStats.ok) setAdminStats(await resStats.json());
+      if (resUsers.ok) setAdminUsers((await resUsers.json()).users || []);
+      if (resLogs.ok) setAdminLogs((await resLogs.json()).logs || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!token || !confirm("Are you sure you want to delete this user?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setAdminUsers((prev) => prev.filter((u) => u.id !== userId));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Handle Analysis (with 5-usage guest limit enforcement)
   const handleAnalyze = async () => {
     const combined = `${title} ${text}`.trim();
     if (!combined) {
-      setErrorMsg("Please enter an article title or body text to analyze.");
+      setErrorMsg("Please enter a headline or article text to analyze.");
       return;
+    }
+
+    // ENFORCE 5 GUEST USES LIMIT FOR NON-LOGGED-IN USERS
+    if (!currentUser) {
+      if (guestCount >= GUEST_USAGE_LIMIT) {
+        setAuthMode("login");
+        setAuthError(`You have used all ${GUEST_USAGE_LIMIT} free guest analyses. Please sign in or create an account to continue using the AI Truth Console.`);
+        setAuthModalOpen(true);
+        setErrorMsg(`Guest quota reached (${GUEST_USAGE_LIMIT}/${GUEST_USAGE_LIMIT}). Sign in to unlock unlimited verifications.`);
+        return;
+      }
     }
 
     setLoading(true);
@@ -96,9 +421,14 @@ export default function FakeNewsDetectorPage() {
     const startTime = performance.now();
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/v1/predict", {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE}/api/v1/predict`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ title, text }),
       });
 
@@ -107,49 +437,73 @@ export default function FakeNewsDetectorPage() {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
+        if (response.status === 403 && !currentUser) {
+          setAuthMode("login");
+          setAuthError(errData.detail || "Guest limit of 5 analyses reached. Please sign in to continue.");
+          setAuthModalOpen(true);
+        }
         throw new Error(errData.detail || `Server error: HTTP ${response.status}`);
       }
 
       const data: PredictionResult = await response.json();
       setResult(data);
 
-      // Trigger subtle celebration when genuine article passes with high confidence
-      if (data.label === 0 && data.confidence > 90) {
+      // Increment guest count for non-logged-in users
+      if (!currentUser) {
+        const newCount = guestCount + 1;
+        setGuestCount(newCount);
+        localStorage.setItem("truth-console-guest-count", String(newCount));
+      }
+
+      // Trigger confetti celebration on authentic news
+      if (data.label === 0 && data.confidence > 85) {
         confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.65 },
+          particleCount: 45,
+          spread: 55,
+          origin: { y: 0.6 },
           colors: ["#10b981", "#3b82f6", "#06b6d4"]
         });
+      }
+
+      // If user is logged in, refresh history count
+      if (token) {
+        fetchUserHistory();
       }
     } catch (err: unknown) {
       console.error(err);
       setErrorMsg(
-        err instanceof Error ? err.message : "Failed to connect to the FastAPI prediction service on port 8000."
+        err instanceof Error ? err.message : "Failed to connect to the prediction backend on port 8000."
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // Shortcut key handler (Ctrl+Enter)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       handleAnalyze();
     }
   };
 
-  const loadPreset = (presetKey: keyof typeof SAMPLE_PRESETS) => {
-    const sample = SAMPLE_PRESETS[presetKey];
+  const loadPreset = (type: "real" | "fake") => {
+    const sample = PRESETS[type];
     setTitle(sample.title);
     setText(sample.text);
     setErrorMsg(null);
     setResult(null);
   };
 
+  const handleClear = () => {
+    setTitle("");
+    setText("");
+    setResult(null);
+    setErrorMsg(null);
+    setLatency(null);
+  };
+
   const copyResult = () => {
     if (!result) return;
-    const textToCopy = `[AI News Analysis]\nTitle: "${title || "Untitled"}"\nVerdict: ${result.prediction} (${result.confidence}% confidence)\nLabel: ${result.label}\nProcessed by Fake News NLP Engine.`;
+    const textToCopy = `[AI News Verification Report]\nHeadline: "${title || "Untitled"}"\nVerdict: ${result.prediction.toUpperCase()}\nConfidence: ${result.confidence.toFixed(2)}%\nAnalyzed via Machine Learning NLP Engine.`;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -158,483 +512,1237 @@ export default function FakeNewsDetectorPage() {
   const wordCount = (title + " " + text).trim().split(/\s+/).filter(Boolean).length;
   const charCount = (title + " " + text).length;
 
-  return (
-    <div className="relative min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden">
-      {/* Background Gradients & Ambient Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-indigo-900/20 via-violet-900/10 to-transparent blur-3xl pointer-events-none -z-10" />
-      <div className="absolute -top-40 right-10 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse-slow" />
-      <div className="absolute top-60 -left-20 w-80 h-80 bg-violet-600/15 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse-slow" />
+  // Calculate needle angle for the analog truth meter:
+  let needleAngle = 0;
+  if (result) {
+    if (result.label === 0) {
+      needleAngle = 10 + (result.confidence / 100) * 60;
+    } else {
+      needleAngle = -(10 + (result.confidence / 100) * 60);
+    }
+  }
 
-      {/* Top Header / Navigation */}
-      <header className="border-b border-slate-800/80 bg-slate-900/40 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                  AI Fake News Detector
-                </span>
-                <span className="px-2 py-0.5 text-xs font-semibold uppercase tracking-wider rounded-md bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
-                  Capstone ML
-                </span>
+  const isDark = theme === "dark";
+  const guestPassesLeft = Math.max(0, GUEST_USAGE_LIMIT - guestCount);
+
+  return (
+    <div className={`min-h-screen flex flex-col font-sans select-none pb-12 transition-colors duration-200 ${
+      isDark ? "bg-[#070a10] text-slate-100" : "bg-[#edf2f7] text-slate-800"
+    }`}>
+      {/* Top Screws & Header Bar */}
+      <div className={`w-full border-b transition-colors ${
+        isDark
+          ? "bg-[#0d121c] border-black/80 shadow-[0_2px_10px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.08)]"
+          : "bg-[#f8fafc] border-slate-300 shadow-[0_2px_10px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,1)]"
+      }`}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          
+          {/* Brand & Console Title */}
+          <div className="flex items-center gap-3.5">
+            <div className="skeuo-screw hidden sm:block" />
+            
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl border-t border-b flex items-center justify-center transition-colors ${
+                isDark
+                  ? "bg-gradient-to-b from-[#2a3447] to-[#141b27] border-white/20 border-b-black/80 shadow-[0_4px_8px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.2)]"
+                  : "bg-gradient-to-b from-[#ffffff] to-[#e2e8f0] border-white border-b-slate-300 shadow-[0_3px_6px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,1)]"
+              }`}>
+                <ShieldCheck className={`w-5 h-5 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
               </div>
-              <p className="text-xs text-slate-400 hidden sm:block">
-                PassiveAggressive Classifier &amp; TF-IDF NLP Architecture
-              </p>
+              
+              <div>
+                <h1 className={`text-base font-extrabold tracking-wider uppercase ${
+                  isDark ? "text-slate-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]" : "text-slate-900 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]"
+                }`}>
+                  Truth Console <span className={`text-xs font-semibold tracking-widest ml-1 opacity-90 ${isDark ? "text-indigo-400" : "text-indigo-600"}`}>// AI VERIFIER</span>
+                </h1>
+                <div className={`text-[11px] tracking-wide font-mono ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                  ANALOG TELEMETRY &bull; POSTGRESQL DB
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Status Badges */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                apiOnline === true
-                  ? "bg-emerald-950/60 text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-950"
-                  : apiOnline === false
-                  ? "bg-rose-950/60 text-rose-400 border-rose-500/30 shadow-sm shadow-rose-950"
-                  : "bg-slate-800 text-slate-400 border-slate-700"
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  apiOnline === true
-                    ? "bg-emerald-400 animate-pulse"
-                    : apiOnline === false
-                    ? "bg-rose-400"
-                    : "bg-amber-400 animate-ping"
+          {/* Controls: Auth, History, Admin, Theme Switch & Jewel Status Lamp */}
+          <div className="flex items-center gap-2 sm:gap-3.5">
+            
+            {/* User Account / Auth Section */}
+            {currentUser ? (
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {/* User Tag */}
+                <div className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 border ${
+                  isDark
+                    ? "bg-[#0b0f19] border-black/80 text-slate-300 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]"
+                    : "bg-slate-100 border-slate-300 text-slate-700 shadow-inner"
+                }`}>
+                  <User className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden md:inline">@{currentUser.username}</span>
+                  {currentUser.role === "admin" && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase">
+                      ADMIN
+                    </span>
+                  )}
+                </div>
+
+                {/* History Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchUserHistory();
+                    setHistoryModalOpen(true);
+                  }}
+                  className={`skeuo-btn px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer ${
+                    isDark ? "text-sky-300" : "text-sky-700 border border-slate-200"
+                  }`}
+                  title="View your personal search history stored in PostgreSQL"
+                >
+                  <History className="w-3.5 h-3.5 text-sky-400" />
+                  <span className="hidden sm:inline">HISTORY</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    isDark ? "bg-sky-500/20 text-sky-300" : "bg-sky-100 text-sky-800"
+                  }`}>
+                    {historyCount}
+                  </span>
+                </button>
+
+                {/* Admin Telemetry Button (Only for Admin role) */}
+                {currentUser.role === "admin" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchAdminData();
+                      setAdminModalOpen(true);
+                    }}
+                    className={`skeuo-btn px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer ${
+                      isDark ? "text-amber-300" : "text-amber-700 border border-slate-200"
+                    }`}
+                    title="Open Administrator Management & Telemetry Console"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden md:inline">ADMIN</span>
+                  </button>
+                )}
+
+                {/* Logout Button */}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className={`skeuo-btn px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1 cursor-pointer ${
+                    isDark ? "text-red-400" : "text-red-600 border border-slate-200"
+                  }`}
+                  title="Sign out of console"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">EXIT</span>
+                </button>
+              </div>
+            ) : (
+              /* Non-Logged In User Section: Show Guest Limit Badge & Login Button */
+              <div className="flex items-center gap-2">
+                <div
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border flex items-center gap-1.5 ${
+                    guestPassesLeft > 0
+                      ? isDark
+                        ? "bg-amber-950/40 text-amber-400 border-amber-500/30"
+                        : "bg-amber-50 text-amber-800 border-amber-300"
+                      : isDark
+                      ? "bg-red-950/60 text-red-400 border-red-500/40 shadow-[0_0_8px_rgba(239,68,68,0.3)] animate-pulse"
+                      : "bg-red-50 text-red-700 border-red-300"
+                  }`}
+                  title="Non-logged in guests receive 5 free analyses before login is required"
+                >
+                  <span>GUEST:</span>
+                  <span className="font-extrabold">{guestPassesLeft} / {GUEST_USAGE_LIMIT} LEFT</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("login");
+                    setAuthError(null);
+                    setAuthModalOpen(true);
+                  }}
+                  className={`skeuo-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer ${
+                    isDark ? "text-indigo-300" : "text-indigo-700 border border-slate-200"
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>SIGN IN</span>
+                </button>
+              </div>
+            )}
+
+            {/* Skeuomorphic Rocker Theme Switch */}
+            <div className={`flex items-center p-1 rounded-xl border ${
+              isDark
+                ? "bg-[#090c13] border-black/90 shadow-[inset_0_2px_5px_rgba(0,0,0,0.8)]"
+                : "bg-slate-200/80 border-slate-300 shadow-[inset_0_2px_4px_rgba(15,23,42,0.1)]"
+            }`}>
+              <button
+                type="button"
+                onClick={() => setTheme("white")}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  !isDark
+                    ? "bg-white text-slate-800 shadow-[0_2px_4px_rgba(15,23,42,0.15),inset_0_1px_0_rgba(255,255,255,1)] border border-slate-200"
+                    : "text-slate-500 hover:text-slate-300"
                 }`}
-              />
-              <span>
-                {apiOnline === true
-                  ? "API Live (96.87% Acc)"
-                  : apiOnline === false
-                  ? "API Disconnected"
-                  : "Connecting..."}
+                title="Switch to White Mode"
+              >
+                <Sun className={`w-3.5 h-3.5 ${!isDark ? "text-amber-500" : "text-slate-500"}`} />
+                <span className="hidden sm:inline">WHITE</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                  isDark
+                    ? "bg-[#1e2430] text-slate-100 shadow-[0_2px_4px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.18)] border border-white/10"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+                title="Switch to Dark Mode"
+              >
+                <Moon className={`w-3.5 h-3.5 ${isDark ? "text-indigo-400" : "text-slate-500"}`} />
+                <span className="hidden sm:inline">DARK</span>
+              </button>
+            </div>
+
+            {/* Physical Status Lamp */}
+            <div className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full border ${
+              isDark
+                ? "bg-[#080b12] border-t-black border-b-white/10 shadow-[inset_0_2px_5px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)]"
+                : "bg-white border-slate-200 shadow-[inset_0_1px_3px_rgba(15,23,42,0.08),0_1px_0_rgba(255,255,255,1)]"
+            }`}>
+              <div className="skeuo-jewel-collar">
+                <div className={apiOnline === true ? "skeuo-jewel-led-green" : "skeuo-jewel-led-red"} />
+              </div>
+              <span className={`text-[11px] font-mono font-semibold tracking-wider hidden sm:inline ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                {apiOnline === true ? "READY" : apiOnline === false ? "OFFLINE" : "WAIT..."}
               </span>
             </div>
 
-            <a
-              href="http://127.0.0.1:8000/docs"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-900/50 transition-colors"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden md:inline">Swagger API Docs</span>
-            </a>
+            <div className="skeuo-screw hidden sm:block" />
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Metric Badges Banner */}
-        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80 backdrop-blur-sm flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              <Zap className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs text-slate-400">Model Accuracy</div>
-              <div className="text-lg font-bold text-white tracking-tight">96.87%</div>
-            </div>
-          </div>
-
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80 backdrop-blur-sm flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-400 border border-violet-500/20">
-              <Database className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs text-slate-400">WELFake Dataset</div>
-              <div className="text-lg font-bold text-white tracking-tight">72,134 Articles</div>
-            </div>
-          </div>
-
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80 backdrop-blur-sm flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs text-slate-400">TF-IDF Vocabulary</div>
-              <div className="text-lg font-bold text-white tracking-tight">50,000 N-Grams</div>
-            </div>
-          </div>
-
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80 backdrop-blur-sm flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <Activity className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs text-slate-400">Inference Latency</div>
-              <div className="text-lg font-bold text-white tracking-tight">
-                {latency ? `${latency} ms` : "< 25 ms"}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Error / Offline Alert */}
+      {/* Main Console Body */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-8 space-y-8">
+        
+        {/* Offline Alert */}
         {apiOnline === false && (
-          <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-between gap-4 text-rose-200">
+          <div className={`skeuo-chassis p-4 border flex items-center justify-between gap-4 ${
+            isDark
+              ? "bg-gradient-to-r from-red-950/40 via-red-900/20 to-slate-900/60 border-red-500/30 text-red-200"
+              : "bg-gradient-to-r from-red-50 via-white to-red-50 border-red-300 text-red-900"
+          }`}>
             <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
-              <div className="text-sm">
-                <strong>Backend Unavailable:</strong> Could not reach the FastAPI server at{" "}
-                <code className="bg-rose-900/40 px-1.5 py-0.5 rounded text-xs font-mono">
-                  http://127.0.0.1:8000
-                </code>
-                . Ensure Uvicorn is active.
+              <AlertTriangle className={`w-5 h-5 shrink-0 ${isDark ? "text-red-400" : "text-red-600"}`} />
+              <div className="text-xs">
+                <span className="font-bold">FastAPI Connection Offline:</span> Prediction server on port 8000 is unreachable. Run <code className={`px-1.5 py-0.5 rounded text-[11px] font-mono ${isDark ? "bg-black/50" : "bg-red-100 text-red-950"}`}>uvicorn app.main:app --port 8000</code>.
               </div>
             </div>
             <button
               onClick={checkHealth}
-              className="text-xs font-medium px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition-colors shrink-0"
+              className={`skeuo-btn px-3 py-1.5 rounded-lg text-xs font-mono ${isDark ? "text-slate-200" : "text-slate-700"}`}
             >
-              Retry Connection
+              RETRY
             </button>
           </div>
         )}
 
-        {/* Input & Results Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Input Form & Quick Presets (7 cols) */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl shadow-2xl shadow-slate-950/50 space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-indigo-400" />
-                  <h2 className="font-semibold text-base text-white">Article Details</h2>
-                </div>
+        {/* Guest Limit Alert Banner when exhausted */}
+        {!currentUser && guestPassesLeft === 0 && (
+          <div className={`p-4 rounded-xl border flex items-center justify-between gap-4 shadow-lg ${
+            isDark
+              ? "bg-gradient-to-r from-amber-950/60 via-red-950/40 to-slate-900/80 border-amber-500/40 text-amber-200"
+              : "bg-gradient-to-r from-amber-50 via-white to-amber-50 border-amber-300 text-amber-900"
+          }`}>
+            <div className="flex items-center gap-3">
+              <Lock className="w-5 h-5 text-amber-400 shrink-0" />
+              <div className="text-xs font-mono">
+                <span className="font-bold uppercase">Guest Free Limit Reached (5/5 Used):</span> You have utilized all 5 complimentary verifications. Please sign in or register to unlock unlimited article analyses and PostgreSQL search archiving.
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setAuthMode("register");
+                setAuthError(null);
+                setAuthModalOpen(true);
+              }}
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold transition-all shadow-md shrink-0 cursor-pointer"
+            >
+              REGISTER / SIGN IN
+            </button>
+          </div>
+        )}
 
-                {/* Quick Presets Dropdown/Chips */}
-                <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                  <span>Presets:</span>
-                  <div className="flex flex-wrap gap-1">
-                    <button
-                      type="button"
-                      onClick={() => loadPreset("real1")}
-                      className="px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 transition-all cursor-pointer font-medium"
-                    >
-                      Sample Real
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => loadPreset("fake1")}
-                      className="px-2.5 py-1 rounded-md bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 transition-all cursor-pointer font-medium"
-                    >
-                      Sample Fake
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => loadPreset("real2")}
-                      className="px-2.5 py-1 rounded-md bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/20 transition-all cursor-pointer font-medium hidden sm:inline-block"
-                    >
-                      NASA Real
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => loadPreset("fake2")}
-                      className="px-2.5 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 transition-all cursor-pointer font-medium hidden sm:inline-block"
-                    >
-                      Cure Fake
-                    </button>
-                  </div>
-                </div>
+        {/* 2-Column Physical Workstation Deck */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* =========================================================================
+              LEFT DECK: INPUT CONSOLE (7 cols)
+              ========================================================================= */}
+          <div className="lg:col-span-7 skeuo-chassis p-6 sm:p-7 space-y-6">
+            
+            {/* Header & Corner Screws */}
+            <div className={`flex items-center justify-between pb-4 border-b ${
+              isDark
+                ? "border-black/60 shadow-[0_1px_0_rgba(255,255,255,0.06)]"
+                : "border-slate-200 shadow-[0_1px_0_rgba(255,255,255,0.8)]"
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className="skeuo-screw" />
+                <span className={`text-xs font-bold tracking-widest uppercase font-mono ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                  INPUT PANEL // ARTICLE INGESTION
+                </span>
               </div>
 
-              {/* Title Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                  <span>Headline / Title</span>
-                  <span className="text-[10px] text-slate-500 lowercase font-normal">optional if body provided</span>
+              {/* Physical Preset Keys */}
+              <div className="flex items-center gap-2 sm:gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => loadPreset("real")}
+                  className={`skeuo-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer ${
+                    isDark ? "text-emerald-400" : "text-emerald-700 border border-slate-200/80"
+                  }`}
+                  title="Load verified genuine article sample"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
+                  SAMPLE REAL
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => loadPreset("fake")}
+                  className={`skeuo-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer ${
+                    isDark ? "text-red-400" : "text-red-700 border border-slate-200/80"
+                  }`}
+                  title="Load fabricated sensationalist article sample"
+                >
+                  <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_6px_#ef4444]" />
+                  SAMPLE FAKE
+                </button>
+              </div>
+            </div>
+
+            {/* Headline / Title Input Well */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className={`text-xs font-bold tracking-wider uppercase font-mono flex items-center gap-1.5 ${
+                  isDark ? "text-slate-300" : "text-slate-700"
+                }`}>
+                  <FileText className={`w-3.5 h-3.5 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
+                  HEADLINE / TITLE
                 </label>
+                <span className={`text-[10px] font-mono font-semibold ${isDark ? "text-slate-500" : "text-slate-400"}`}>OPTIONAL</span>
+              </div>
+              <div className={`skeuo-inset rounded-xl p-1.5 ${!isDark ? "border border-slate-200" : ""}`}>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="e.g. Breaking: White House unveils new climate policy framework..."
-                  className="w-full px-4 py-3 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all text-sm"
+                  placeholder="Enter news headline or claim..."
+                  className={`w-full bg-transparent px-3 py-2 text-sm font-mono focus:outline-none ${
+                    isDark ? "text-slate-100 placeholder-slate-600" : "text-slate-900 placeholder-slate-400"
+                  }`}
                 />
               </div>
+            </div>
 
-              {/* Body Textarea */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    Article Body Text
-                  </label>
-                  <span className="text-xs text-slate-500">
-                    {wordCount} words &bull; {charCount} chars
-                  </span>
+            {/* Article Body Textarea Well */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className={`text-xs font-bold tracking-wider uppercase font-mono ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                  ARTICLE BODY TEXT
+                </label>
+                <div className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                  isDark
+                    ? "bg-[#06080d] border border-black/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.9)] text-indigo-300/80"
+                    : "bg-slate-100 border border-slate-200 shadow-inner text-indigo-800"
+                }`}>
+                  {wordCount.toString().padStart(3, "0")} WORDS &bull; {charCount.toString().padStart(4, "0")} CHARS
                 </div>
+              </div>
+              <div className={`skeuo-inset rounded-xl p-2 ${!isDark ? "border border-slate-200" : ""}`}>
                 <textarea
                   rows={8}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Paste the full article content or paragraph to evaluate for misinformation markers..."
-                  className="w-full px-4 py-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all text-sm leading-relaxed resize-y font-mono"
+                  placeholder="Paste complete article content or paragraphs here to inspect for misinformation patterns..."
+                  className={`w-full bg-transparent px-2 py-1 text-sm font-mono leading-relaxed resize-y min-h-[170px] focus:outline-none ${
+                    isDark ? "text-slate-200 placeholder-slate-600" : "text-slate-800 placeholder-slate-400"
+                  }`}
                 />
+              </div>
+            </div>
+
+            {/* Tactile Control Buttons Bar */}
+            <div className={`pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 border-t ${
+              isDark
+                ? "border-black/60 shadow-[0_1px_0_rgba(255,255,255,0.06)]"
+                : "border-slate-200 shadow-[0_1px_0_rgba(255,255,255,0.8)]"
+            }`}>
+              
+              {/* Keyboard Stamp */}
+              <div className={`flex items-center gap-1.5 text-[11px] font-mono ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                <span className={`px-1.5 py-0.5 rounded font-bold shadow-[0_2px_0_#cbd5e1] border-t border-b ${
+                  isDark
+                    ? "bg-[#131924] border-t-white/20 border-b-black text-slate-300 shadow-[0_2px_0_#070a10]"
+                    : "bg-white border-t-white border-b-slate-300 text-slate-800"
+                }`}>
+                  CTRL
+                </span>
+                <span>+</span>
+                <span className={`px-1.5 py-0.5 rounded font-bold shadow-[0_2px_0_#cbd5e1] border-t border-b ${
+                  isDark
+                    ? "bg-[#131924] border-t-white/20 border-b-black text-slate-300 shadow-[0_2px_0_#070a10]"
+                    : "bg-white border-t-white border-b-slate-300 text-slate-800"
+                }`}>
+                  ENTER
+                </span>
+                <span className={`ml-1 font-semibold ${isDark ? "text-slate-500" : "text-slate-500"}`}>EXECUTE</span>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <kbd className="px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono text-[10px] border border-slate-700">
-                    Ctrl
-                  </kbd>{" "}
-                  +{" "}
-                  <kbd className="px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono text-[10px] border border-slate-700">
-                    Enter
-                  </kbd>{" "}
-                  <span>to run prediction</span>
-                </div>
-
-                <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                  {(title || text) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTitle("");
-                        setText("");
-                        setResult(null);
-                        setErrorMsg(null);
-                      }}
-                      className="px-4 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800 transition-colors cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  )}
-
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                {(title || text) && (
                   <button
                     type="button"
-                    onClick={handleAnalyze}
-                    disabled={loading || (!title.trim() && !text.trim())}
-                    className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/45 disabled:opacity-50 disabled:pointer-events-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    onClick={handleClear}
+                    className={`skeuo-btn px-4 py-2.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer ${
+                      isDark ? "text-slate-300" : "text-slate-700"
+                    }`}
                   >
-                    {loading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Analyzing Text...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>Analyze Article</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
+                    <RotateCcw className={`w-3.5 h-3.5 ${isDark ? "text-slate-400" : "text-slate-500"}`} />
+                    CLEAR
                   </button>
-                </div>
-              </div>
+                )}
 
-              {errorMsg && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
+                <button
+                  type="button"
+                  onClick={handleAnalyze}
+                  disabled={loading || (!title.trim() && !text.trim())}
+                  className={`skeuo-btn-primary flex-1 sm:flex-initial px-6 py-2.5 rounded-xl text-xs font-mono font-extrabold tracking-wider text-white flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:pointer-events-none cursor-pointer ${
+                    !currentUser && guestPassesLeft === 0 ? "opacity-75 ring-2 ring-amber-500" : ""
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                      <span>PROCESSING INFERENCE...</span>
+                    </>
+                  ) : !currentUser && guestPassesLeft === 0 ? (
+                    <>
+                      <Lock className="w-4 h-4 text-amber-300" />
+                      <span>SIGN IN TO ANALYZE</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-sky-100" />
+                      <span>ANALYZE ARTICLE</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-sky-100" />
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* Quick Architecture Info Note */}
-            <div className="p-4 rounded-2xl bg-slate-900/30 border border-slate-800/60 text-xs text-slate-400 flex items-start gap-3">
-              <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-slate-300">How Inference Works:</strong> Text is passed through our cached NLTK tokenization &amp; lemmatization pipeline, converted to a 50,000-feature TF-IDF sparse matrix, and evaluated by the high-margin PassiveAggressiveClassifier.
+            {errorMsg && (
+              <div className={`p-3 rounded-xl border text-xs font-mono flex items-center gap-2.5 shadow-inner ${
+                isDark
+                  ? "bg-red-950/60 border-red-500/40 text-red-200"
+                  : "bg-red-50 border-red-200 text-red-700"
+              }`}>
+                <AlertTriangle className={`w-4 h-4 shrink-0 ${isDark ? "text-red-400" : "text-red-600"}`} />
+                <span>{errorMsg}</span>
               </div>
+            )}
+
+            {/* Bottom Corner Screws & Auth Tip */}
+            <div className="flex items-center justify-between pt-2">
+              <div className="skeuo-screw" />
+              {!currentUser ? (
+                <div className="text-[11px] font-mono text-slate-500">
+                  <span className="text-amber-400 font-bold">GUEST USAGE:</span> {guestPassesLeft} of {GUEST_USAGE_LIMIT} free analyses available. Sign in for unlimited analyses &amp; PostgreSQL archiving.
+                </div>
+              ) : (
+                <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5" />
+                  <span>Authenticated as @{currentUser.username} &bull; Unlimited verifications enabled</span>
+                </div>
+              )}
+              <div className="skeuo-screw" />
             </div>
           </div>
 
-          {/* Right Column: Results & Metrics Dashboard (5 cols) */}
-          <div className="lg:col-span-5 space-y-6">
-            {result ? (
-              <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                {/* Hero Prediction Card */}
+          {/* =========================================================================
+              RIGHT DECK: ANALOG TRUTH GAUGE & VERDICT PLAQUE (5 cols)
+              ========================================================================= */}
+          <div className="lg:col-span-5 skeuo-chassis p-6 sm:p-7 space-y-6">
+            
+            {/* Telemetry Header */}
+            <div className={`flex items-center justify-between pb-3 border-b ${
+              isDark
+                ? "border-black/60 shadow-[0_1px_0_rgba(255,255,255,0.06)]"
+                : "border-slate-200 shadow-[0_1px_0_rgba(255,255,255,0.8)]"
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className="skeuo-screw" />
+                <span className={`text-xs font-bold tracking-widest uppercase font-mono ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                  TELEMETRY // TRUTH GAUGE
+                </span>
+              </div>
+              <Gauge className={`w-4 h-4 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
+            </div>
+
+            {/* Precision Analog VU Meter */}
+            <div className={`relative skeuo-inset rounded-2xl p-5 overflow-hidden flex flex-col items-center border ${
+              isDark
+                ? "bg-[#090c13] border-transparent"
+                : "border-slate-200 bg-gradient-to-b from-white to-[#f1f5f9]"
+            }`}>
+              
+              {/* Glass Reflection Highlight */}
+              <div className="absolute inset-0 skeuo-glass-reflection rounded-2xl" />
+
+              {/* Gauge Dial Face */}
+              <div className="relative w-full max-w-[280px] h-[145px] overflow-hidden flex flex-col items-center">
+                
+                <svg viewBox="0 0 240 130" className={`w-full h-full ${isDark ? "drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" : "drop-shadow-[0_2px_4px_rgba(15,23,42,0.12)]"}`}>
+                  {/* Outer Bezel Arc */}
+                  <path
+                    d="M 20 120 A 100 100 0 0 1 220 120"
+                    fill="none"
+                    stroke={isDark ? "#1e293b" : "#cbd5e1"}
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                  />
+                  
+                  {/* Red Zone: Fake */}
+                  <path
+                    d="M 20 120 A 100 100 0 0 1 80 40"
+                    fill="none"
+                    stroke="#ef4444"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    className={isDark ? "opacity-80" : ""}
+                  />
+
+                  {/* Amber Neutral Zone */}
+                  <path
+                    d="M 80 40 A 100 100 0 0 1 160 40"
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth="6"
+                    className={isDark ? "opacity-75" : ""}
+                  />
+
+                  {/* Green Zone: Real */}
+                  <path
+                    d="M 160 40 A 100 100 0 0 1 220 120"
+                    fill="none"
+                    stroke={isDark ? "#22c55e" : "#10b981"}
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    className={isDark ? "opacity-85" : ""}
+                  />
+
+                  {/* Precision Tick Marks */}
+                  <line x1="28" y1="110" x2="38" y2="105" stroke={isDark ? "#94a3b8" : "#475569"} strokeWidth="1.5" />
+                  <line x1="60" y1="62" x2="68" y2="70" stroke={isDark ? "#94a3b8" : "#475569"} strokeWidth="1.5" />
+                  <line x1="120" y1="20" x2="120" y2="30" stroke={isDark ? "#94a3b8" : "#1e293b"} strokeWidth="2" />
+                  <line x1="180" y1="62" x2="172" y2="70" stroke={isDark ? "#94a3b8" : "#475569"} strokeWidth="1.5" />
+                  <line x1="212" y1="110" x2="202" y2="105" stroke={isDark ? "#94a3b8" : "#475569"} strokeWidth="1.5" />
+
+                  {/* Scale Labels */}
+                  <text x="22" y="128" fill="#ef4444" fontSize="8" fontFamily="monospace" fontWeight="bold">FAKE</text>
+                  <text x="108" y="42" fill={isDark ? "#94a3b8" : "#475569"} fontSize="8" fontFamily="monospace" fontWeight="bold">CALIBRATED</text>
+                  <text x="195" y="128" fill={isDark ? "#22c55e" : "#059669"} fontSize="8" fontFamily="monospace" fontWeight="bold">REAL</text>
+                </svg>
+
+                {/* The Physical Needle */}
                 <div
-                  className={`p-6 rounded-3xl border backdrop-blur-xl shadow-2xl relative overflow-hidden ${
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-[98px] origin-bottom transition-transform duration-1000 ease-out"
+                  style={{
+                    transform: `translateX(-50%) rotate(${needleAngle}deg)`,
+                    transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)"
+                  }}
+                >
+                  <div className={`w-full h-full rounded-t-full ${
+                    isDark
+                      ? "bg-gradient-to-t from-red-600 via-orange-400 to-amber-200 shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+                      : "bg-gradient-to-t from-red-600 via-orange-500 to-amber-300 shadow-[0_0_6px_rgba(239,68,68,0.6)]"
+                  }`} />
+                </div>
+
+                {/* Heavy Center Pivot Cap */}
+                <div className={`absolute -bottom-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                  isDark
+                    ? "bg-gradient-to-b from-[#64748b] via-[#334155] to-[#0f172a] border-[#1e293b] shadow-[0_2px_6px_rgba(0,0,0,0.9),inset_0_1px_2px_rgba(255,255,255,0.4)]"
+                    : "bg-gradient-to-b from-[#ffffff] via-[#e2e8f0] to-[#94a3b8] border-slate-300 shadow-[0_2px_6px_rgba(15,23,42,0.2),inset_0_1px_2px_rgba(255,255,255,0.9)]"
+                }`}>
+                  <div className={`w-2.5 h-2.5 rounded-full border shadow-inner ${
+                    isDark ? "bg-[#0b0f19] border-white/20" : "bg-slate-700 border-white"
+                  }`} />
+                </div>
+              </div>
+
+              {/* Meter Calibration Readout */}
+              <div className={`w-full mt-3 pt-3 border-t flex items-center justify-between text-[11px] font-mono ${
+                isDark ? "border-black/80" : "border-slate-200"
+              }`}>
+                <span className={`font-semibold ${isDark ? "text-slate-500" : "text-slate-500"}`}>METER STATUS</span>
+                <span className={`font-bold ${isDark ? "text-slate-300" : "text-slate-800"}`}>
+                  {result ? (result.label === 0 ? "AUTHENTIC RANGE" : "DECEPTIVE RANGE") : "STANDBY // IDLE"}
+                </span>
+              </div>
+            </div>
+
+            {/* Verdict Plaque */}
+            {result ? (
+              <div className="space-y-4 animate-in fade-in duration-300">
+                <div
+                  className={`p-5 rounded-2xl border shadow-xl relative overflow-hidden ${
                     result.label === 0
-                      ? "bg-gradient-to-b from-emerald-950/60 via-slate-900/80 to-slate-950/90 border-emerald-500/40 shadow-emerald-950/40"
-                      : "bg-gradient-to-b from-rose-950/60 via-slate-900/80 to-slate-950/90 border-rose-500/40 shadow-rose-950/40"
+                      ? isDark
+                        ? "bg-gradient-to-b from-[#0e271a] via-[#091b12] to-[#050f0a] border-t-emerald-400/40 border-l-emerald-500/20 border-r-black border-b-black shadow-[0_8px_20px_rgba(16,185,129,0.25)]"
+                        : "bg-gradient-to-b from-[#f0fdf4] via-[#ecfdf5] to-[#dcfce7] border-emerald-300 shadow-[0_8px_20px_rgba(16,185,129,0.15)]"
+                      : isDark
+                        ? "bg-gradient-to-b from-[#2d1214] via-[#1f0b0d] to-[#120507] border-t-red-400/40 border-l-red-500/20 border-r-black border-b-black shadow-[0_8px_20px_rgba(239,68,68,0.25)]"
+                        : "bg-gradient-to-b from-[#fef2f2] via-[#fff1f2] to-[#fee2e2] border-red-300 shadow-[0_8px_20px_rgba(239,68,68,0.15)]"
                   }`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                        Classification Verdict
-                      </span>
+                    <div>
                       <div className="flex items-center gap-2">
-                        <h3
-                          className={`text-2xl font-extrabold tracking-tight ${
-                            result.label === 0 ? "text-emerald-400" : "text-rose-400"
-                          }`}
-                        >
-                          {result.prediction.toUpperCase()}
-                        </h3>
+                        <span className={`text-[10px] font-mono tracking-widest uppercase font-bold ${
+                          isDark ? "text-slate-400" : "text-slate-500"
+                        }`}>
+                          OFFICIAL VERDICT
+                        </span>
+                        {result.saved_to_history && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                            <Database className="w-2.5 h-2.5" /> SAVED TO DB
+                          </span>
+                        )}
+                        {!currentUser && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            GUEST: {guestPassesLeft} LEFT
+                          </span>
+                        )}
                       </div>
+                      <h3
+                        className={`text-xl font-black tracking-wider uppercase font-mono mt-0.5 ${
+                          result.label === 0
+                            ? isDark ? "text-emerald-400 drop-shadow-[0_0_10px_rgba(34,197,94,0.6)]" : "text-emerald-800 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]"
+                            : isDark ? "text-red-400 drop-shadow-[0_0_10px_rgba(239,68,68,0.6)]" : "text-red-800 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]"
+                        }`}
+                      >
+                        {result.label === 0 ? "VERIFIED AUTHENTIC" : "FABRICATED / FAKE"}
+                      </h3>
                     </div>
 
-                    <div
-                      className={`p-3 rounded-2xl ${
-                        result.label === 0
-                          ? "bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/40"
-                          : "bg-rose-500/20 text-rose-400 ring-1 ring-rose-500/40"
-                      }`}
-                    >
-                      {result.label === 0 ? (
-                        <ShieldCheck className="w-8 h-8" />
-                      ) : (
-                        <AlertTriangle className="w-8 h-8" />
-                      )}
+                    <div className="skeuo-jewel-collar">
+                      <div className={result.label === 0 ? "skeuo-jewel-led-green" : "skeuo-jewel-led-red"} />
                     </div>
                   </div>
 
-                  <p className="mt-3 text-xs text-slate-300 leading-relaxed">
+                  <p className={`mt-2.5 text-xs font-sans leading-relaxed ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                     {result.label === 0
-                      ? "The article aligns with linguistic patterns, syntax, and neutral vocabulary typical of verified news journalism."
-                      : "The article exhibits high-frequency markers of sensationalism, hyperpartisan rhetoric, or synthetic misdirection."}
+                      ? "Article exhibits semantic coherence and neutral syntax conforming to credible journalism."
+                      : "Article exhibits high-frequency sensationalist markers and syntax indicative of misinformation."}
                   </p>
 
-                  {/* Confidence Score Gauge */}
-                  <div className="mt-6 pt-5 border-t border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-medium">Model Confidence Score</span>
-                      <span
-                        className={`font-mono font-bold text-sm ${
-                          result.label === 0 ? "text-emerald-400" : "text-rose-400"
+                  {/* Metrics Strip */}
+                  <div className={`mt-4 pt-3 border-t grid grid-cols-2 gap-2 text-xs font-mono ${
+                    isDark ? "border-black/80" : "border-slate-200/80"
+                  }`}>
+                    <div className={`skeuo-inset p-2 rounded-lg ${!isDark ? "border border-slate-200" : ""}`}>
+                      <div className={`text-[10px] font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>CONFIDENCE</div>
+                      <div
+                        className={`text-base font-extrabold ${
+                          result.label === 0
+                            ? isDark ? "text-emerald-400" : "text-emerald-700"
+                            : isDark ? "text-red-400" : "text-red-700"
                         }`}
                       >
                         {result.confidence.toFixed(2)}%
-                      </span>
+                      </div>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="w-full h-3 rounded-full bg-slate-950 border border-slate-800 overflow-hidden p-0.5">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ease-out ${
-                          result.label === 0
-                            ? "bg-gradient-to-r from-emerald-500 to-teal-400"
-                            : "bg-gradient-to-r from-amber-500 via-rose-500 to-red-500"
-                        }`}
-                        style={{ width: `${Math.min(Math.max(result.confidence, 10), 100)}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-slate-500">
-                      <span>Threshold: 50%</span>
-                      <span>
-                        {result.confidence >= 90
-                          ? "★ Highly Confident"
-                          : result.confidence >= 75
-                          ? "Moderate Confidence"
-                          : "Borderline"}
-                      </span>
-                      <span>Max: 100%</span>
+                    <div className={`skeuo-inset p-2 rounded-lg ${!isDark ? "border border-slate-200" : ""}`}>
+                      <div className={`text-[10px] font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>LATENCY</div>
+                      <div className={`text-base font-extrabold ${isDark ? "text-indigo-300" : "text-indigo-700"}`}>
+                        {latency ? `${latency} ms` : "< 15 ms"}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Action Copy */}
-                  <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                    <span className="text-xs text-slate-400">Class Label: {result.label}</span>
+                  {/* Tactile Copy Button */}
+                  <div className={`mt-4 pt-3 border-t flex items-center justify-between ${
+                    isDark ? "border-black/80" : "border-slate-200/80"
+                  }`}>
+                    <span className={`text-[10px] font-mono font-semibold ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                      OUTPUT ID #{Math.floor(result.confidence * 123).toString(16).toUpperCase()}
+                    </span>
+
                     <button
+                      type="button"
                       onClick={copyResult}
-                      className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer"
+                      className={`skeuo-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer ${
+                        isDark ? "text-slate-200" : "text-slate-700"
+                      }`}
                     >
                       {copied ? (
                         <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-emerald-400">Copied!</span>
+                          <Check className={`w-3.5 h-3.5 ${isDark ? "text-emerald-400" : "text-emerald-600"}`} />
+                          <span className={isDark ? "text-emerald-400" : "text-emerald-700"}>COPIED</span>
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Copy Verdict</span>
+                          <Copy className={`w-3.5 h-3.5 ${isDark ? "text-slate-400" : "text-slate-500"}`} />
+                          <span>COPY VERDICT</span>
                         </>
                       )}
                     </button>
-                  </div>
-                </div>
-
-                {/* NLP & Pipeline Process Breakdown */}
-                <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl shadow-xl space-y-4">
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-800">
-                    <Cpu className="w-4 h-4 text-violet-400" />
-                    <h4 className="font-semibold text-sm text-white">Inference Diagnostics</h4>
-                  </div>
-
-                  <div className="space-y-3 text-xs">
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60">
-                      <span className="text-slate-400">Response Latency</span>
-                      <span className="font-mono text-emerald-400 font-semibold">{latency} ms</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60">
-                      <span className="text-slate-400">Model Algorithm</span>
-                      <span className="text-slate-200 font-medium">PassiveAggressive (Loss: Hinge)</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60">
-                      <span className="text-slate-400">Feature Extractor</span>
-                      <span className="text-slate-200 font-medium">TF-IDF (1, 2-grams, 50k max)</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60">
-                      <span className="text-slate-400">NLP Stages</span>
-                      <span className="text-indigo-400 font-medium">Lower &bull; Stopwords &bull; Lemmatized</span>
-                    </div>
                   </div>
                 </div>
               </div>
             ) : (
-              /* Empty State / Ready to Analyze Card */
-              <div className="p-8 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-4 flex flex-col items-center justify-center min-h-[360px]">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                  <Search className="w-7 h-7" />
-                </div>
-                <div className="space-y-1.5 max-w-sm">
-                  <h3 className="font-semibold text-base text-white">Ready for Analysis</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Paste an article or click any of the <strong>Sample Presets</strong> on the left to evaluate text authenticity in real-time.
+              /* Standby State Plaque */
+              <div className={`skeuo-inset p-6 rounded-2xl text-center space-y-3 flex flex-col items-center justify-center min-h-[160px] border ${
+                isDark ? "border-transparent bg-transparent" : "border-slate-200 bg-white/70"
+              }`}>
+                <Activity className={`w-6 h-6 opacity-80 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
+                <div className="space-y-1">
+                  <div className={`text-xs font-mono font-bold uppercase tracking-wider ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                    CONSOLE IN STANDBY
+                  </div>
+                  <p className="text-[11px] text-slate-500 max-w-xs font-mono leading-relaxed">
+                    Insert headline and article body into the left console or select a preset switch to execute telemetry.
                   </p>
-                </div>
-                <div className="flex flex-wrap justify-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => loadPreset("real1")}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
-                  >
-                    Try Sample Real News
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => loadPreset("fake1")}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
-                  >
-                    Try Sample Fake News
-                  </button>
                 </div>
               </div>
             )}
+
+            {/* Bottom Screws */}
+            <div className="flex items-center justify-between pt-2">
+              <div className="skeuo-screw" />
+              <div className="skeuo-screw" />
+            </div>
           </div>
         </div>
       </main>
 
+      {/* =========================================================================
+          MODAL 1: AUTHENTICATION (LOGIN / REGISTER)
+          ========================================================================= */}
+      {authModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className={`w-full max-w-md skeuo-chassis p-6 sm:p-7 rounded-2xl border shadow-2xl relative ${
+            isDark ? "bg-[#0f1420] border-slate-700" : "bg-white border-slate-300"
+          }`}>
+            <button
+              onClick={() => setAuthModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-700/50">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-mono font-bold text-base uppercase text-slate-100">
+                  {authMode === "login" ? "Console Access // Login" : "Operator Enrollment // Sign Up"}
+                </h3>
+                <div className="text-[11px] font-mono text-slate-400">
+                  PostgreSQL Authenticated Session
+                </div>
+              </div>
+            </div>
+
+            {/* Mode Switch Tabs */}
+            <div className="flex items-center gap-2 my-4 p-1 rounded-xl bg-black/30 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => { setAuthMode("login"); setAuthError(null); }}
+                className={`flex-1 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+                  authMode === "login"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                SIGN IN
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMode("register"); setAuthError(null); }}
+                className={`flex-1 py-1.5 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+                  authMode === "register"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                CREATE ACCOUNT
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleAuthSubmit} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono font-bold uppercase text-slate-300">
+                  {authMode === "login" ? "Username or Email" : "Username"}
+                </label>
+                <div className="skeuo-inset rounded-lg p-1.5">
+                  <input
+                    type="text"
+                    required
+                    value={authUsername}
+                    onChange={(e) => setAuthUsername(e.target.value)}
+                    placeholder={authMode === "login" ? "e.g. admin or username" : "Choose username"}
+                    className="w-full bg-transparent px-2.5 py-1.5 text-xs font-mono focus:outline-none text-slate-100 placeholder-slate-500"
+                  />
+                </div>
+              </div>
+
+              {authMode === "register" && (
+                <div className="space-y-1">
+                  <label className="text-[11px] font-mono font-bold uppercase text-slate-300">
+                    Email Address
+                  </label>
+                  <div className="skeuo-inset rounded-lg p-1.5">
+                    <input
+                      type="email"
+                      required
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="user@example.com"
+                      className="w-full bg-transparent px-2.5 py-1.5 text-xs font-mono focus:outline-none text-slate-100 placeholder-slate-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono font-bold uppercase text-slate-300">
+                  Password
+                </label>
+                <div className="skeuo-inset rounded-lg p-1.5">
+                  <input
+                    type="password"
+                    required
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-transparent px-2.5 py-1.5 text-xs font-mono focus:outline-none text-slate-100 placeholder-slate-500"
+                  />
+                </div>
+                {authMode === "login" && (
+                  <div className="text-[10px] font-mono text-slate-400 pt-0.5">
+                    Default Administrator: <code className="text-amber-400">admin</code> / <code className="text-amber-400">admin123</code>
+                  </div>
+                )}
+              </div>
+
+              {authError && (
+                <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-500/40 text-red-200 text-xs font-mono flex items-center gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                  <span>{authError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full skeuo-btn-primary py-2.5 rounded-xl text-xs font-mono font-extrabold tracking-wider text-white flex items-center justify-center gap-2 mt-4 cursor-pointer disabled:opacity-50"
+              >
+                {authLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>AUTHENTICATING...</span>
+                  </>
+                ) : (
+                  <>
+                    <Key className="w-3.5 h-3.5" />
+                    <span>{authMode === "login" ? "AUTHENTICATE SESSION" : "REGISTER OPERATOR"}</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 2: SEARCH HISTORY DRAWER
+          ========================================================================= */}
+      {historyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className={`w-full max-w-2xl max-h-[85vh] flex flex-col skeuo-chassis p-6 rounded-2xl border shadow-2xl relative ${
+            isDark ? "bg-[#0f1420] border-slate-700" : "bg-white border-slate-300"
+          }`}>
+            <button
+              onClick={() => setHistoryModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* History Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-700/50 pr-8">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-sky-600/20 text-sky-400 border border-sky-500/30 flex items-center justify-center">
+                  <History className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-mono font-bold text-base uppercase text-slate-100 flex items-center gap-2">
+                    Search History <span className="text-xs text-sky-400 font-normal">({userHistory.length} records)</span>
+                  </h3>
+                  <div className="text-[11px] font-mono text-slate-400">
+                    Archived in PostgreSQL for @{currentUser?.username}
+                  </div>
+                </div>
+              </div>
+
+              {userHistory.length > 0 && (
+                <button
+                  onClick={handleClearAllHistory}
+                  className="px-2.5 py-1 text-[11px] font-mono font-bold rounded-lg bg-red-950/40 text-red-400 hover:bg-red-900/60 border border-red-500/30 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>CLEAR ALL</span>
+                </button>
+              )}
+            </div>
+
+            {/* History List */}
+            <div className="flex-1 overflow-y-auto my-4 space-y-2.5 pr-1">
+              {historyLoading ? (
+                <div className="py-12 text-center text-slate-400 font-mono text-xs flex flex-col items-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin text-sky-400" />
+                  <span>Loading query history from PostgreSQL database...</span>
+                </div>
+              ) : userHistory.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 font-mono text-xs space-y-2">
+                  <Database className="w-8 h-8 mx-auto opacity-50 text-slate-600" />
+                  <div>No search history found in database.</div>
+                  <div className="text-[11px] text-slate-600">Run an analysis while signed in to automatically record searches.</div>
+                </div>
+              ) : (
+                userHistory.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`p-3.5 rounded-xl border transition-all flex items-start justify-between gap-3 ${
+                      isDark
+                        ? "bg-[#090d16] border-slate-800 hover:border-slate-700"
+                        : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
+                            item.label === 0
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              : "bg-red-500/20 text-red-400 border border-red-500/30"
+                          }`}
+                        >
+                          {item.prediction}
+                        </span>
+                        <span className="text-[11px] font-mono font-bold text-slate-300">
+                          {Number(item.confidence).toFixed(2)}%
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500">
+                          &bull; {item.latency_ms}ms
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500">
+                          &bull; {new Date(item.created_at).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="font-mono text-xs font-semibold text-slate-200 truncate">
+                        {item.headline || "Untitled Article"}
+                      </div>
+                      <p className="text-[11px] font-sans text-slate-400 line-clamp-2 leading-relaxed">
+                        {item.content_preview}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => restoreHistoryItem(item)}
+                        className="px-2.5 py-1 rounded text-[11px] font-mono font-bold bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/40 border border-indigo-500/30 transition-all cursor-pointer"
+                        title="Load into active console"
+                      >
+                        LOAD
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteHistoryItem(item.id)}
+                        className="p-1 rounded text-slate-500 hover:text-red-400 transition-colors cursor-pointer"
+                        title="Delete record"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-[11px] font-mono text-slate-500">
+              <span>TABLE: <code className="text-slate-400 font-bold">prediction_history</code></span>
+              <button
+                onClick={() => setHistoryModalOpen(false)}
+                className="skeuo-btn px-4 py-1.5 rounded-lg text-xs font-mono font-bold text-slate-300 cursor-pointer"
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 3: ADMINISTRATOR TELEMETRY & MANAGEMENT CONSOLE
+          ========================================================================= */}
+      {adminModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className={`w-full max-w-3xl max-h-[88vh] flex flex-col skeuo-chassis p-6 rounded-2xl border shadow-2xl relative ${
+            isDark ? "bg-[#0f1420] border-slate-700" : "bg-white border-slate-300"
+          }`}>
+            <button
+              onClick={() => setAdminModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Admin Header */}
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-700/50">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-mono font-bold text-base uppercase text-slate-100 flex items-center gap-2">
+                  Admin Telemetry &amp; System Governance
+                </h3>
+                <div className="text-[11px] font-mono text-slate-400">
+                  Raw SQL PostgreSQL Engine Metrics &bull; Multi-User Supervision
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex items-center gap-2 my-4 border-b border-slate-700/40 pb-2">
+              <button
+                onClick={() => setAdminTab("stats")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                  adminTab === "stats"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                METRICS SUMMARY
+              </button>
+              <button
+                onClick={() => setAdminTab("users")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                  adminTab === "users"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                USERS DIRECTORY ({adminUsers.length})
+              </button>
+              <button
+                onClick={() => setAdminTab("logs")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                  adminTab === "logs"
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                GLOBAL AUDIT LOGS ({adminLogs.length})
+              </button>
+            </div>
+
+            {/* Admin Content Area */}
+            <div className="flex-1 overflow-y-auto pr-1">
+              {adminLoading ? (
+                <div className="py-16 text-center text-slate-400 font-mono text-xs flex flex-col items-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin text-amber-400" />
+                  <span>Aggregating PostgreSQL telemetry data via Raw SQL...</span>
+                </div>
+              ) : adminTab === "stats" ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">Registered Users</div>
+                      <div className="text-xl font-bold font-mono text-slate-100 mt-1">
+                        {adminStats?.total_users || 0}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">Total Predictions</div>
+                      <div className="text-xl font-bold font-mono text-sky-400 mt-1">
+                        {adminStats?.total_predictions || 0}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">Active Today</div>
+                      <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
+                        {adminStats?.active_today || 0}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">Real Predictions</div>
+                      <div className="text-xl font-bold font-mono text-emerald-400 mt-1">
+                        {adminStats?.real_predictions || 0}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">Fake Predictions</div>
+                      <div className="text-xl font-bold font-mono text-red-400 mt-1">
+                        {adminStats?.fake_predictions || 0}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                      <div className="text-[10px] font-mono text-slate-400 uppercase">Average Latency</div>
+                      <div className="text-xl font-bold font-mono text-indigo-400 mt-1">
+                        {adminStats?.avg_latency || 0} ms
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-xs font-mono text-slate-400 space-y-1.5">
+                    <div className="text-slate-300 font-bold">SQL Database Diagnostics:</div>
+                    <div>&bull; Database Engine: PostgreSQL 18 (Localhost:5432)</div>
+                    <div>&bull; Query Layer: Pure Raw SQL (Zero ORM overhead)</div>
+                    <div>&bull; Tables Active: <code className="text-amber-400">users</code>, <code className="text-amber-400">prediction_history</code></div>
+                  </div>
+                </div>
+              ) : adminTab === "users" ? (
+                <div className="space-y-2">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left font-mono text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                          <th className="py-2 px-3">ID</th>
+                          <th className="py-2 px-3">User</th>
+                          <th className="py-2 px-3">Email</th>
+                          <th className="py-2 px-3">Role</th>
+                          <th className="py-2 px-3">Searches</th>
+                          <th className="py-2 px-3">Joined</th>
+                          <th className="py-2 px-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {adminUsers.map((u) => (
+                          <tr key={u.id} className="hover:bg-slate-900/40">
+                            <td className="py-2.5 px-3 text-slate-500">#{u.id}</td>
+                            <td className="py-2.5 px-3 font-bold text-slate-200">{u.username}</td>
+                            <td className="py-2.5 px-3 text-slate-400">{u.email}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                u.role === "admin" ? "bg-amber-500/20 text-amber-300" : "bg-slate-800 text-slate-300"
+                              }`}>
+                                {u.role}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-sky-400 font-bold">{u.prediction_count}</td>
+                            <td className="py-2.5 px-3 text-slate-500 text-[10px]">
+                              {new Date(u.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              {u.role !== "admin" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUser(u.id)}
+                                  className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                                  title="Delete User"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                /* Global Audit Logs */
+                <div className="space-y-2">
+                  {adminLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 flex items-start justify-between gap-3 text-xs font-mono"
+                    >
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                            log.prediction === "Real News" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                          }`}>
+                            {log.prediction}
+                          </span>
+                          <span className="text-slate-300 font-bold">{log.confidence}%</span>
+                          <span className="text-slate-500">&bull; {log.latency_ms}ms</span>
+                          <span className="text-indigo-400 font-semibold">&bull; @{log.username || "Guest"}</span>
+                        </div>
+                        <div className="text-slate-200 truncate font-semibold">{log.headline}</div>
+                        <div className="text-[10px] text-slate-500">{new Date(log.created_at).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Admin Footer */}
+            <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={fetchAdminData}
+                className="px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>REFRESH TELEMETRY</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdminModalOpen(false)}
+                className="skeuo-btn px-4 py-1.5 rounded-lg text-xs font-mono font-bold text-slate-300 cursor-pointer"
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
-      <footer className="border-t border-slate-800/60 bg-slate-950 py-6 mt-12 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div>
-            Built with <strong>Next.js 15</strong>, <strong>Tailwind CSS</strong>, <strong>FastAPI</strong>, and <strong>Scikit-Learn</strong>.
+      <footer className={`mt-auto border-t py-4 text-center text-xs font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${
+        isDark
+          ? "border-black/80 bg-[#090c13] text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+          : "border-slate-300 bg-[#f8fafc] text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,1)]"
+      }`}>
+        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_4px_#10b981]" />
+            <span className={`font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>AI TRUTH CONSOLE // ACTIVE</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Model 96.87% Accuracy
-            </span>
-            <span>&bull;</span>
-            <span>WELFake Corpus</span>
-          </div>
+          <div>PASSIVE-AGGRESSIVE NLP CLASSIFIER &bull; POSTGRESQL DB</div>
         </div>
       </footer>
     </div>
