@@ -5,10 +5,12 @@ import { Check, ArrowRight } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { Navbar } from "@/components/Navbar";
 import { SiteFooter } from "@/components/SiteFooter";
+import { api } from "@/lib/api";
 
 export default function PricingPage() {
-  const { currentUser, setPricingModalOpen, showToast } = useApp();
+  const { currentUser, token, setAuthModalOpen, showToast } = useApp();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   const plans = [
     {
@@ -69,12 +71,31 @@ export default function PricingPage() {
     }
   ];
 
-  const handleSelectPlan = (planId: string) => {
+  const handleSelectPlan = async (planId: string) => {
     if (planId === "free") {
       showToast("You are already on the Free Community tier.", "info");
       return;
     }
-    setPricingModalOpen(true);
+    
+    if (!token || !currentUser) {
+      setAuthModalOpen(true);
+      showToast("Please sign in or register to select a subscription plan.", "info");
+      return;
+    }
+
+    setLoadingPlan(planId);
+    try {
+      showToast(`Redirecting to Secure Checkout...`, "info");
+      const res = await api.createCheckoutSession(planId, token);
+      if (res.checkout_url) {
+        window.location.href = res.checkout_url;
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Subscription checkout error";
+      showToast(msg, "error");
+    } finally {
+      setLoadingPlan(null);
+    }
   };
 
   const featureMatrix = [
@@ -186,7 +207,7 @@ export default function PricingPage() {
                   <button
                     type="button"
                     onClick={() => handleSelectPlan(p.id)}
-                    disabled={isCurrent}
+                    disabled={isCurrent || loadingPlan !== null}
                     className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       isCurrent
                         ? "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-default"
@@ -195,8 +216,8 @@ export default function PricingPage() {
                         : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
                     }`}
                   >
-                    <span>{isCurrent ? "Current Plan" : p.cta}</span>
-                    {!isCurrent && <ArrowRight className="w-3.5 h-3.5" />}
+                    <span>{loadingPlan === p.id ? "Processing..." : isCurrent ? "Current Plan" : p.cta}</span>
+                    {!isCurrent && loadingPlan !== p.id && <ArrowRight className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
