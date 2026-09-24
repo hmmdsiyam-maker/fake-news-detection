@@ -1,0 +1,42 @@
+# Virtual Environments
+venv/
+ENV/
+env/
+**/venv/
+**/env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+**/*.pyc
+
+# Node & Frontend Build
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+build/
+dist/
+
+# Dataset Files (Large > 100MB)
+data/*.csv
+**/data/*.csv
+*.csv
+
+# Jupyter & IDE
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+.vscode/
+.idea/
+
+# Environment Variables & Logs
+.env
+.env*.local
+*.log
+npm-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
