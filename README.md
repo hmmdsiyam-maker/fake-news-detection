@@ -8,7 +8,7 @@
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4+-38B2AC?style=for-the-badge&logo=tailwind-css)
 
 🚀 **Live Web App:** [https://fake-news-detection-nine-zeta.vercel.app](https://fake-news-detection-nine-zeta.vercel.app)  
-📡 **Live API Docs (Swagger):** [https://fake-news-detection-u7l5.onrender.com/docs](https://fake-news-detection-u7l5.onrender.com/docs)  
+📡 **Live API Docs (Swagger):** [https://fake-news-detection-uzl5.onrender.com/docs](https://fake-news-detection-u7l5.onrender.com/docs)  
 
 **Veritas** is a production-ready, full-stack Machine Learning SaaS platform designed to detect fabricated news articles and misinformation in real-time. Built with a high-performance **FastAPI** Python backend and a beautiful, responsive **Next.js** frontend featuring glassmorphism and modern UI/UX principles.
 
