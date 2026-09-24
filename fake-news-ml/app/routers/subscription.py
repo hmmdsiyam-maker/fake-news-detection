@@ -85,9 +85,10 @@ async def create_checkout_session(
             print(f"[!] Stripe Checkout creation failed: {e}")
     
     # 2. Seamless Sandbox Simulator Mode (Instant testing for development)
+    domain = payload.success_url or FRONTEND_URL
     simulated_session_id = f"sim_cs_{int(time.time())}_{current_user['id']}"
     return {
-        "checkout_url": f"{FRONTEND_URL}?session_id={simulated_session_id}&plan_id={plan['id']}&checkout=success",
+        "checkout_url": f"{domain}?session_id={simulated_session_id}&plan_id={plan['id']}&checkout=success",
         "session_id": simulated_session_id,
         "mode": "simulator",
         "plan": plan,
