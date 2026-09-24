@@ -147,10 +147,29 @@ export const Navbar: React.FC = () => {
 
               {/* User Dropdown */}
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-1.5 w-52 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-1 shadow-lg animate-in fade-in zoom-in-95 duration-100 z-50">
-                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800/60 text-[11px]">
+                <div className="absolute right-0 mt-1.5 w-60 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-1 shadow-lg animate-in fade-in zoom-in-95 duration-100 z-50">
+                  <div className="px-3 py-3 border-b border-slate-100 dark:border-slate-800/60 text-[11px]">
                     <div className="text-slate-500 dark:text-slate-400">Signed in as</div>
                     <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">{currentUser.email}</div>
+                    
+                    <div className="mt-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 dark:text-slate-400">Plan Status</span>
+                        <span className={`font-bold uppercase ${currentUser.subscription_tier !== "free" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-600 dark:text-slate-300"}`}>
+                          {currentUser.subscription_tier === "free" ? "Free" : "Active"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 dark:text-slate-400">Daily Limit</span>
+                        <span className="font-mono text-slate-700 dark:text-slate-200">{currentUser.daily_limit}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 dark:text-slate-400">Remaining</span>
+                        <span className="font-mono font-semibold text-indigo-600 dark:text-indigo-400">
+                          {currentUser.today_remaining && currentUser.today_remaining < 0 ? "∞" : currentUser.today_remaining}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="py-1">
@@ -164,18 +183,6 @@ export const Navbar: React.FC = () => {
                     >
                       <History className="w-3.5 h-3.5 text-slate-400" />
                       <span>Check History</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUserDropdownOpen(false);
-                        setPricingModalOpen(true);
-                      }}
-                      className="w-full px-3 py-1.5 rounded-lg text-left text-xs flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
-                    >
-                      <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Subscription Plan</span>
                     </button>
 
                     {currentUser.role === "admin" && (
