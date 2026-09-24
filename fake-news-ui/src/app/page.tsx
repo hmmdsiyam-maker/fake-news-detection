@@ -29,7 +29,11 @@ import {
   BarChart3,
   Search,
   ExternalLink,
-  Key
+  Key,
+  CreditCard,
+  Zap,
+  CheckCircle2,
+  Crown
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
@@ -40,6 +44,8 @@ interface PredictionResult {
   latency_ms?: number;
   saved_to_history?: boolean;
   guest_remaining?: number | null;
+  daily_remaining?: number | null;
+  subscription_tier?: string;
   status: string;
 }
 
@@ -48,6 +54,23 @@ interface UserProfile {
   username: string;
   email: string;
   role: string;
+  subscription_tier?: string;
+  today_count?: number;
+  daily_limit?: number | string;
+  today_remaining?: number;
+}
+
+interface SubscriptionPlan {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  interval: string;
+  daily_limit: number | string;
+  description: string;
+  badge?: string;
+  is_popular?: boolean;
+  features: string[];
 }
 
 interface HistoryItem {
@@ -145,6 +168,14 @@ export default function FakeNewsDetectorPage() {
   const [adminTab, setAdminTab] = useState<"stats" | "users" | "logs">("stats");
   const [adminLoading, setAdminLoading] = useState(false);
 
+  // Subscription & Stripe Monetization State
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<string>("pro");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutSuccessNotice, setCheckoutSuccessNotice] = useState<string | null>(null);
+  const [quotaExhaustedModalOpen, setQuotaExhaustedModalOpen] = useState(false);
+
   // Sync theme with body class and localStorage
   useEffect(() => {
     const saved = localStorage.getItem("truth-console-theme") as "white" | "dark" | null;
@@ -159,12 +190,20 @@ export default function FakeNewsDetectorPage() {
     localStorage.setItem("truth-console-theme", theme);
   }, [theme]);
 
-  // Load Auth Token & Guest Count from localStorage on mount
+  // Load Auth Token & Guest Count from localStorage on mount & check Stripe Checkout
   useEffect(() => {
     const savedGuest = localStorage.getItem("truth-console-guest-count");
     if (savedGuest) {
       setGuestCount(parseInt(savedGuest, 10) || 0);
     }
+
+    // Load available plans from backend
+    fetch(`${API_BASE}/api/v1/subscription/plans`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.plans) setPlans(data.plans);
+      })
+      .catch(() => {});
 
     const savedToken = localStorage.getItem("truth-console-token");
     const savedUser = localStorage.getItem("truth-console-user");
@@ -192,6 +231,55 @@ export default function FakeNewsDetectorPage() {
           });
       } catch {
         // ignore parse error
+      }
+    }
+
+    // Check for returned Stripe Checkout session redirect
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const checkoutSessionId = urlParams.get("session_id");
+      const checkoutPlanId = urlParams.get("plan_id");
+      const checkoutStatus = urlParams.get("checkout");
+
+      if (checkoutStatus === "success" && checkoutSessionId && checkoutPlanId) {
+        const activeToken = savedToken || localStorage.getItem("truth-console-token");
+        if (activeToken) {
+          fetch(`${API_BASE}/api/v1/subscription/verify-session`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${activeToken}`
+            },
+            body: JSON.stringify({
+              session_id: checkoutSessionId,
+              plan_id: checkoutPlanId
+            })
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.status === "success") {
+                if (data.token) {
+                  setToken(data.token);
+                  localStorage.setItem("truth-console-token", data.token);
+                }
+                if (data.user) {
+                  setCurrentUser(data.user);
+                  localStorage.setItem("truth-console-user", JSON.stringify(data.user));
+                }
+                setCheckoutSuccessNotice(`Account upgraded to ${checkoutPlanId.toUpperCase()}! You now have unlimited daily verifications.`);
+                confetti({
+                  particleCount: 100,
+                  spread: 80,
+                  origin: { y: 0.5 },
+                  colors: ["#6366f1", "#10b981", "#f59e0b", "#ec4899"]
+                });
+              }
+            })
+            .catch((err) => console.error("Verify session error:", err))
+            .finally(() => {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            });
+        }
       }
     }
   }, []);
@@ -397,7 +485,100 @@ export default function FakeNewsDetectorPage() {
     }
   };
 
-  // Handle Analysis (with 5-usage guest limit enforcement)
+  // Stripe Plan Subscription / Upgrade
+  const handleUpgradePlan = async (planId: string) => {
+    if (!token) {
+      setAuthMode("login");
+      setAuthError("Please sign in or create an account to activate a subscription.");
+      setAuthModalOpen(true);
+      return;
+    }
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/subscription/create-checkout-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          plan_id: planId,
+          success_url: typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to initialize Stripe checkout.");
+
+      if (data.mode === "live_stripe" && data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        // Test Sandbox Simulator: instant upgrade
+        const verifyRes = await fetch(`${API_BASE}/api/v1/subscription/verify-session`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            session_id: data.session_id,
+            plan_id: planId
+          })
+        });
+        const verifyData = await verifyRes.json();
+        if (verifyData.status === "success") {
+          if (verifyData.token) {
+            setToken(verifyData.token);
+            localStorage.setItem("truth-console-token", verifyData.token);
+          }
+          if (verifyData.user) {
+            setCurrentUser(verifyData.user);
+            localStorage.setItem("truth-console-user", JSON.stringify(verifyData.user));
+          }
+          setPricingModalOpen(false);
+          setQuotaExhaustedModalOpen(false);
+          setCheckoutSuccessNotice(`Upgraded to ${planId.toUpperCase()}! You now enjoy UNLIMITED daily fact-checks.`);
+          confetti({
+            particleCount: 100,
+            spread: 80,
+            origin: { y: 0.5 },
+            colors: ["#10b981", "#3b82f6", "#f59e0b", "#ec4899"]
+          });
+        }
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Checkout error");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!token || !confirm("Downgrade subscription back to Free Tier (20 daily checks)?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/subscription/cancel`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.token) {
+          setToken(data.token);
+          localStorage.setItem("truth-console-token", data.token);
+        }
+        if (currentUser) {
+          const updated = { ...currentUser, subscription_tier: "free", today_remaining: 20 };
+          setCurrentUser(updated);
+          localStorage.setItem("truth-console-user", JSON.stringify(updated));
+        }
+        setPricingModalOpen(false);
+        setCheckoutSuccessNotice("Subscription downgraded to Free Tier (20 checks/day).");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Handle Analysis (with 5 guest uses and 20 daily free uses enforcement)
   const handleAnalyze = async () => {
     const combined = `${title} ${text}`.trim();
     if (!combined) {
@@ -405,13 +586,22 @@ export default function FakeNewsDetectorPage() {
       return;
     }
 
-    // ENFORCE 5 GUEST USES LIMIT FOR NON-LOGGED-IN USERS
+    // 1. ENFORCE 5 GUEST USES LIMIT FOR NON-LOGGED-IN USERS
     if (!currentUser) {
       if (guestCount >= GUEST_USAGE_LIMIT) {
         setAuthMode("login");
         setAuthError(`You have used all ${GUEST_USAGE_LIMIT} free guest analyses. Please sign in or create an account to continue using the AI Truth Console.`);
         setAuthModalOpen(true);
-        setErrorMsg(`Guest quota reached (${GUEST_USAGE_LIMIT}/${GUEST_USAGE_LIMIT}). Sign in to unlock unlimited verifications.`);
+        setErrorMsg(`Guest quota reached (${GUEST_USAGE_LIMIT}/${GUEST_USAGE_LIMIT}). Sign in to continue.`);
+        return;
+      }
+    } else {
+      // 2. ENFORCE 20 DAILY CHECKS FOR FREE REGISTERED USERS
+      const isFree = !currentUser.subscription_tier || currentUser.subscription_tier === "free";
+      const isNotAdmin = currentUser.role !== "admin";
+      if (isFree && isNotAdmin && currentUser.today_remaining === 0) {
+        setQuotaExhaustedModalOpen(true);
+        setErrorMsg("Daily quota of 20 verifications reached. Upgrade to Pro for unlimited verifications.");
         return;
       }
     }
@@ -441,6 +631,8 @@ export default function FakeNewsDetectorPage() {
           setAuthMode("login");
           setAuthError(errData.detail || "Guest limit of 5 analyses reached. Please sign in to continue.");
           setAuthModalOpen(true);
+        } else if (response.status === 402 || (response.status === 403 && currentUser)) {
+          setQuotaExhaustedModalOpen(true);
         }
         throw new Error(errData.detail || `Server error: HTTP ${response.status}`);
       }
@@ -453,6 +645,20 @@ export default function FakeNewsDetectorPage() {
         const newCount = guestCount + 1;
         setGuestCount(newCount);
         localStorage.setItem("truth-console-guest-count", String(newCount));
+      } else {
+        // Update user's remaining count in local state
+        setCurrentUser((prev) => {
+          if (!prev) return null;
+          const updatedRemaining = data.daily_remaining !== null && data.daily_remaining !== undefined ? data.daily_remaining : prev.today_remaining;
+          const updated = {
+            ...prev,
+            today_remaining: updatedRemaining,
+            today_count: (prev.today_count || 0) + 1,
+            subscription_tier: data.subscription_tier || prev.subscription_tier
+          };
+          localStorage.setItem("truth-console-user", JSON.stringify(updated));
+          return updated;
+        });
       }
 
       // Trigger confetti celebration on authentic news
@@ -563,7 +769,7 @@ export default function FakeNewsDetectorPage() {
             </div>
           </div>
 
-          {/* Controls: Auth, History, Admin, Theme Switch & Jewel Status Lamp */}
+          {/* Controls: Auth, Daily Quota, Pricing, History, Admin, Theme Switch & Jewel Status Lamp */}
           <div className="flex items-center gap-2 sm:gap-3.5">
             
             {/* User Account / Auth Section */}
@@ -583,6 +789,64 @@ export default function FakeNewsDetectorPage() {
                     </span>
                   )}
                 </div>
+
+                {/* Subscription Tier & Daily Quota Badge */}
+                {currentUser.subscription_tier === "pro" ? (
+                  <button
+                    type="button"
+                    onClick={() => setPricingModalOpen(true)}
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/40 hover:border-emerald-400 transition-all cursor-pointer shadow-sm"
+                    title="Pro Subscriber - Unlimited Verifications. Click to manage plan."
+                  >
+                    <Crown className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>PRO (UNLIMITED)</span>
+                  </button>
+                ) : currentUser.subscription_tier === "enterprise" ? (
+                  <button
+                    type="button"
+                    onClick={() => setPricingModalOpen(true)}
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-purple-500/40 hover:border-purple-400 transition-all cursor-pointer shadow-sm"
+                    title="Enterprise Subscriber - Newsroom Level. Click to manage."
+                  >
+                    <Crown className="w-3.5 h-3.5 text-purple-400" />
+                    <span>ENTERPRISE</span>
+                  </button>
+                ) : (
+                  /* Free Tier User: Show 20 Daily Checks Remaining and Upgrade Button */
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1 border ${
+                        (currentUser.today_remaining ?? (20 - (currentUser.today_count || 0))) > 0
+                          ? isDark
+                            ? "bg-[#0b0f19] border-slate-800 text-slate-300 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]"
+                            : "bg-slate-100 border-slate-300 text-slate-700 shadow-inner"
+                          : isDark
+                          ? "bg-red-950/40 border-red-500/40 text-red-400 animate-pulse"
+                          : "bg-red-50 border-red-300 text-red-700"
+                      }`}
+                      title="Free accounts receive 20 news verifications per day (resets 00:00 UTC)"
+                    >
+                      <span className="text-[10px] text-slate-500 hidden sm:inline">DAILY:</span>
+                      <span className={
+                        (currentUser.today_remaining ?? (20 - (currentUser.today_count || 0))) > 0
+                          ? "text-sky-400 font-extrabold"
+                          : "text-red-400 font-extrabold"
+                      }>
+                        {Math.max(0, currentUser.today_remaining !== undefined && currentUser.today_remaining !== null ? currentUser.today_remaining : (20 - (currentUser.today_count || 0)))} / 20
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPricingModalOpen(true)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white shadow-sm hover:shadow-orange-500/20 transition-all cursor-pointer"
+                      title="Upgrade to Pro with Stripe for Unlimited Verifications"
+                    >
+                      <Zap className="w-3.5 h-3.5 fill-current" />
+                      <span className="hidden sm:inline">UPGRADE</span>
+                    </button>
+                  </div>
+                )}
 
                 {/* History Button */}
                 <button
@@ -637,7 +901,7 @@ export default function FakeNewsDetectorPage() {
                 </button>
               </div>
             ) : (
-              /* Non-Logged In User Section: Show Guest Limit Badge & Login Button */
+              /* Non-Logged In User Section: Show Guest Limit Badge, Pricing & Login Button */
               <div className="flex items-center gap-2">
                 <div
                   className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border flex items-center gap-1.5 ${
@@ -657,6 +921,18 @@ export default function FakeNewsDetectorPage() {
 
                 <button
                   type="button"
+                  onClick={() => setPricingModalOpen(true)}
+                  className={`skeuo-btn px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1 cursor-pointer ${
+                    isDark ? "text-amber-400" : "text-amber-700 border border-slate-200"
+                  }`}
+                  title="View Subscription Plans & Pricing"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">PLANS</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => {
                     setAuthMode("login");
                     setAuthError(null);
@@ -666,8 +942,6 @@ export default function FakeNewsDetectorPage() {
                     isDark ? "text-indigo-300" : "text-indigo-700 border border-slate-200"
                   }`}
                 >
-                  <LogIn className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>SIGN IN</span>
                 </button>
               </div>
             )}
@@ -1731,7 +2005,340 @@ export default function FakeNewsDetectorPage() {
         </div>
       )}
 
-      {/* Footer */}
+      {/* =========================================================================
+          MODAL 4: STRIPE SUBSCRIPTION & UPGRADE PRICING CONSOLE
+          ========================================================================= */}
+      {pricingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className={`w-full max-w-4xl max-h-[92vh] flex flex-col skeuo-chassis p-6 sm:p-7 rounded-2xl border shadow-2xl relative overflow-y-auto ${
+            isDark ? "bg-[#0b0f19] border-slate-700" : "bg-white border-slate-300"
+          }`}>
+            <button
+              onClick={() => setPricingModalOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3.5 pb-4 border-b border-slate-700/50">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <CreditCard className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-mono font-bold text-lg uppercase tracking-wider text-slate-100 flex items-center gap-2">
+                  Subscription Monetization <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">STRIPE GATEWAY</span>
+                </h3>
+                <div className="text-xs font-mono text-slate-400">
+                  Upgrade your truth verification capacity &bull; Cancel anytime
+                </div>
+              </div>
+            </div>
+
+            {/* Plans Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
+              
+              {/* PLAN 1: FREE STARTER */}
+              <div className={`p-5 rounded-2xl border flex flex-col justify-between transition-all ${
+                (!currentUser?.subscription_tier || currentUser?.subscription_tier === "free")
+                  ? "border-sky-500/60 bg-sky-950/20 shadow-[0_0_15px_rgba(14,165,233,0.15)]"
+                  : isDark ? "bg-[#090d16] border-slate-800" : "bg-slate-50 border-slate-200"
+              }`}>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-extrabold uppercase tracking-wider text-slate-400">STARTER</span>
+                    {(!currentUser?.subscription_tier || currentUser?.subscription_tier === "free") && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">CURRENT PLAN</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-2xl font-mono font-black text-slate-100">$0 <span className="text-xs font-normal text-slate-400">/ forever</span></div>
+                    <p className="text-xs text-slate-400 mt-1">Essential fact-checking tools for everyday casual readers.</p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs font-mono">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span><strong>20 Daily</strong> AI Verifications</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>PassiveAggressive NLP (96.87%)</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Last 50 Search History</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                      <span>Standard Processing Speed</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-5 mt-4">
+                  {(!currentUser?.subscription_tier || currentUser?.subscription_tier === "free") ? (
+                    <button
+                      disabled
+                      className="w-full py-2.5 rounded-xl font-mono text-xs font-bold bg-slate-800 text-slate-400 cursor-default text-center"
+                    >
+                      ACTIVE TIER
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleCancelSubscription}
+                      className="w-full py-2.5 rounded-xl font-mono text-xs font-bold border border-slate-700 hover:bg-slate-800 text-slate-300 transition-all cursor-pointer"
+                    >
+                      DOWNGRADE TO FREE
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* PLAN 2: PRO VERIFIER (RECOMMENDED) */}
+              <div className="p-5 rounded-2xl border-2 border-amber-500/80 bg-gradient-to-b from-amber-950/20 via-[#0e1422] to-[#090d16] shadow-[0_0_25px_rgba(245,158,11,0.2)] flex flex-col justify-between relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-[10px] font-mono font-black tracking-widest uppercase shadow-md">
+                  ★ MOST POPULAR ★
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-extrabold uppercase tracking-wider text-amber-400">PRO VERIFIER</span>
+                    {currentUser?.subscription_tier === "pro" && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">CURRENT PLAN</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-2xl font-mono font-black text-slate-100">$9.99 <span className="text-xs font-normal text-slate-400">/ month</span></div>
+                    <p className="text-xs text-slate-400 mt-1">Built for journalists, researchers, and professional content creators.</p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs font-mono">
+                    <div className="flex items-center gap-2 text-amber-300 font-bold">
+                      <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0 fill-current" />
+                      <span>UNLIMITED Daily Verifications</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>High-Priority Pipeline (&lt;50ms)</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Full History Search &amp; Re-run</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>CSV/JSON Data Audit Export</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-200">
+                      <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>Verified Pro Badge on Console</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-5 mt-4">
+                  {currentUser?.subscription_tier === "pro" ? (
+                    <button
+                      disabled
+                      className="w-full py-2.5 rounded-xl font-mono text-xs font-bold bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 cursor-default text-center"
+                    >
+                      ACTIVE PRO PLAN
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleUpgradePlan("pro")}
+                      disabled={checkoutLoading}
+                      className="w-full py-2.5 rounded-xl font-mono text-xs font-bold bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-lg shadow-orange-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer font-extrabold"
+                    >
+                      {checkoutLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                          <span>CONNECTING TO STRIPE...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-4 h-4" />
+                          <span>UPGRADE WITH STRIPE ($9.99)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* PLAN 3: ENTERPRISE */}
+              <div className={`p-5 rounded-2xl border flex flex-col justify-between transition-all ${
+                currentUser?.subscription_tier === "enterprise"
+                  ? "border-purple-500/60 bg-purple-950/20 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+                  : isDark ? "bg-[#090d16] border-slate-800" : "bg-slate-50 border-slate-200"
+              }`}>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-extrabold uppercase tracking-wider text-purple-400">ENTERPRISE</span>
+                    {currentUser?.subscription_tier === "enterprise" && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">CURRENT PLAN</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-2xl font-mono font-black text-slate-100">$49.99 <span className="text-xs font-normal text-slate-400">/ month</span></div>
+                    <p className="text-xs text-slate-400 mt-1">Full-scale mitigation suite for newsrooms, publishers, and platforms.</p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800/80 space-y-2 text-xs font-mono">
+                    <div className="flex items-center gap-2 text-purple-300 font-bold">
+                      <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0 fill-current" />
+                      <span>Unlimited for Full Newsroom</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Dedicated REST API &amp; Webhooks</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Custom Fine-Tuned NLP Models</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>99.9% High Availability SLA</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>24/7 Dedicated Account Engineer</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-5 mt-4">
+                  {currentUser?.subscription_tier === "enterprise" ? (
+                    <button
+                      disabled
+                      className="w-full py-2.5 rounded-xl font-mono text-xs font-bold bg-purple-600/30 text-purple-300 border border-purple-500/40 cursor-default text-center"
+                    >
+                      ACTIVE ENTERPRISE PLAN
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleUpgradePlan("enterprise")}
+                      disabled={checkoutLoading}
+                      className="w-full py-2.5 rounded-xl font-mono text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all flex items-center justify-center gap-2 cursor-pointer font-extrabold shadow-md"
+                    >
+                      {checkoutLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                          <span>CONNECTING...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-4 h-4" />
+                          <span>UPGRADE ($49.99)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Security & Sandbox Notice Footer */}
+            <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-mono text-slate-400">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>PCI-DSS Compliant via Stripe &bull; 256-Bit SSL &bull; Sandbox Simulator Active</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPricingModalOpen(false)}
+                className="skeuo-btn px-4 py-1.5 rounded-lg text-xs font-mono font-bold text-slate-300 cursor-pointer"
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 5: DAILY FREE QUOTA EXHAUSTED (20/20) ALERT MODAL
+          ========================================================================= */}
+      {quotaExhaustedModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className={`w-full max-w-md skeuo-chassis p-6 rounded-2xl border border-red-500/50 shadow-2xl relative text-center ${
+            isDark ? "bg-[#0d121e]" : "bg-white"
+          }`}>
+            <button
+              onClick={() => setQuotaExhaustedModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 flex items-center justify-center shadow-lg shadow-red-500/20 mb-4 animate-pulse">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+
+            <h3 className="font-mono font-black text-lg uppercase tracking-wider text-slate-100 mb-2">
+              Daily Limit Reached (20/20)
+            </h3>
+
+            <p className="text-xs text-slate-300 leading-relaxed mb-6 font-mono">
+              You have completed all <strong className="text-amber-400">20 free news verifications</strong> allocated for your account today.
+              Your daily limit automatically resets every 24 hours at 00:00 UTC.
+            </p>
+
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuotaExhaustedModalOpen(false);
+                  handleUpgradePlan("pro");
+                }}
+                disabled={checkoutLoading}
+                className="w-full py-3 rounded-xl font-mono text-xs font-bold bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <Zap className="w-4 h-4 fill-current" />
+                <span>UPGRADE TO PRO — UNLIMITED ($9.99/MO)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setQuotaExhaustedModalOpen(false);
+                  setPricingModalOpen(true);
+                }}
+                className="w-full py-2 rounded-xl font-mono text-xs font-bold border border-slate-700 hover:bg-slate-800 text-slate-300 transition-all cursor-pointer"
+              >
+                VIEW ALL PLANS
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuotaExhaustedModalOpen(false)}
+                className="text-[11px] font-mono text-slate-500 hover:text-slate-400 cursor-pointer pt-1"
+              >
+                I will wait for tomorrow's reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Success Floating Notification Banner */}
+      {checkoutSuccessNotice && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md p-4 rounded-xl bg-gradient-to-r from-emerald-950/90 to-slate-900/90 border border-emerald-500/50 shadow-2xl backdrop-blur-md flex items-start gap-3 animate-in slide-in-from-bottom-5 duration-300">
+          <Sparkles className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs font-mono">
+            <div className="text-emerald-400 font-bold uppercase tracking-wider mb-1">Subscription Upgraded!</div>
+            <p className="text-slate-200">{checkoutSuccessNotice}</p>
+          </div>
+          <button
+            onClick={() => setCheckoutSuccessNotice(null)}
+            className="text-slate-400 hover:text-slate-200 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       <footer className={`mt-auto border-t py-4 text-center text-xs font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${
         isDark
           ? "border-black/80 bg-[#090c13] text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"

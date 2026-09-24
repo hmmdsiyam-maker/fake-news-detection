@@ -10,3 +10,7 @@ fastapi
 uvicorn
 wordcloud
 plotly
+stripe
+psycopg
+bcrypt
+pyjwt

@@ -88,6 +88,14 @@ def init_db():
             ON prediction_history(user_id, created_at DESC);
         """)
 
+        # Add subscription fields to users table (migration safe)
+        cur.execute("""
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_tier VARCHAR(20) NOT NULL DEFAULT 'free';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(100);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(100);
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'active';
+        """)
+
         conn.commit()
 
     conn.close()
@@ -103,7 +111,7 @@ def raw_create_user(username: str, email: str, password_hash: str, role: str = "
     query = """
         INSERT INTO users (username, email, password_hash, role)
         VALUES (%s, %s, %s, %s)
-        RETURNING id, username, email, role, created_at;
+        RETURNING id, username, email, role, subscription_tier, created_at;
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -114,7 +122,7 @@ def raw_create_user(username: str, email: str, password_hash: str, role: str = "
 
 def raw_get_user_by_username(username: str):
     query = """
-        SELECT id, username, email, password_hash, role, created_at, last_login
+        SELECT id, username, email, password_hash, role, subscription_tier, stripe_customer_id, created_at, last_login
         FROM users
         WHERE LOWER(username) = LOWER(%s);
     """
@@ -125,7 +133,7 @@ def raw_get_user_by_username(username: str):
 
 def raw_get_user_by_email(email: str):
     query = """
-        SELECT id, username, email, password_hash, role, created_at, last_login
+        SELECT id, username, email, password_hash, role, subscription_tier, stripe_customer_id, created_at, last_login
         FROM users
         WHERE LOWER(email) = LOWER(%s);
     """
@@ -136,7 +144,7 @@ def raw_get_user_by_email(email: str):
 
 def raw_get_user_by_id(user_id: int):
     query = """
-        SELECT id, username, email, role, created_at, last_login
+        SELECT id, username, email, role, subscription_tier, stripe_customer_id, created_at, last_login
         FROM users
         WHERE id = %s;
     """
@@ -151,6 +159,37 @@ def raw_update_last_login(user_id: int):
         with conn.cursor() as cur:
             cur.execute(query, (user_id,))
             conn.commit()
+
+def raw_get_user_today_prediction_count(user_id: int) -> int:
+    """Return count of predictions performed by the user today (since 00:00 UTC)."""
+    query = """
+        SELECT COUNT(*) AS today_count
+        FROM prediction_history
+        WHERE user_id = %s AND created_at >= CURRENT_DATE;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (user_id,))
+            row = cur.fetchone()
+            return int(row["today_count"]) if row and row["today_count"] else 0
+
+def raw_update_user_subscription(user_id: int, tier: str, stripe_customer_id: str = None, stripe_subscription_id: str = None):
+    """Upgrade or modify a user's subscription tier."""
+    query = """
+        UPDATE users
+        SET subscription_tier = %s,
+            stripe_customer_id = COALESCE(%s, stripe_customer_id),
+            stripe_subscription_id = COALESCE(%s, stripe_subscription_id),
+            subscription_status = 'active'
+        WHERE id = %s
+        RETURNING id, username, email, role, subscription_tier;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (tier, stripe_customer_id, stripe_subscription_id, user_id))
+            updated = cur.fetchone()
+            conn.commit()
+            return updated
 
 # --- Prediction Search History Raw SQL ---
 
@@ -245,6 +284,7 @@ def raw_get_admin_users():
             u.username, 
             u.email, 
             u.role, 
+            u.subscription_tier,
             u.created_at, 
             u.last_login,
             COUNT(h.id) AS prediction_count

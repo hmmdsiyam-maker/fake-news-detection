@@ -38,13 +38,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except Exception:
         return False
 
-def create_access_token(user_id: int, username: str, role: str) -> str:
+def create_access_token(user_id: int, username: str, role: str, subscription_tier: str = "free") -> str:
     """Generate a signed JWT access token."""
     now = int(time.time())
     payload = {
         "sub": str(user_id),
         "username": username,
         "role": role,
+        "tier": subscription_tier,
         "iat": now,
         "exp": now + JWT_EXPIRATION_SECONDS
     }
