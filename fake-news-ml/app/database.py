@@ -9,6 +9,7 @@ import os
 import psycopg
 from psycopg.rows import dict_row
 
+DATABASE_URL = os.getenv("DATABASE_URL")
 DB_HOST = os.getenv("POSTGRES_HOST", "localhost")
 DB_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 DB_USER = os.getenv("POSTGRES_USER", "postgres")
@@ -17,39 +18,43 @@ DB_NAME = os.getenv("POSTGRES_DB", "fake_news_db")
 
 def get_connection():
     """Return a new psycopg connection using dict_row factory."""
-    return psycopg.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        dbname=DB_NAME,
-        row_factory=dict_row
-    )
+    if DATABASE_URL:
+        return psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    else:
+        return psycopg.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            dbname=DB_NAME,
+            row_factory=dict_row
+        )
 
 def init_db():
     """
     Ensure the target database exists, then initialize required tables
     with pure Raw SQL schema DDL.
     """
-    # 1. Connect to root 'postgres' db to ensure 'fake_news_db' exists
-    try:
-        root_conn = psycopg.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            dbname="postgres",
-            autocommit=True
-        )
-        with root_conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM pg_database WHERE datname = %s;", (DB_NAME,))
-            if not cur.fetchone():
-                print(f"[*] Database '{DB_NAME}' does not exist. Creating database with Raw SQL...")
-                cur.execute(f'CREATE DATABASE "{DB_NAME}";')
-                print(f"[+] Database '{DB_NAME}' created successfully!")
-        root_conn.close()
-    except Exception as e:
-        print(f"[!] Root connection notice: {e}")
+    # 1. Connect to root 'postgres' db to ensure 'fake_news_db' exists (if not using DATABASE_URL)
+    if not DATABASE_URL:
+        try:
+            root_conn = psycopg.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                dbname="postgres",
+                autocommit=True
+            )
+            with root_conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM pg_database WHERE datname = %s;", (DB_NAME,))
+                if not cur.fetchone():
+                    print(f"[*] Database '{DB_NAME}' does not exist. Creating database with Raw SQL...")
+                    cur.execute(f'CREATE DATABASE "{DB_NAME}";')
+                    print(f"[+] Database '{DB_NAME}' created successfully!")
+            root_conn.close()
+        except Exception as e:
+            print(f"[!] Root connection notice: {e}")
 
     # 2. Connect to the application database and create tables with Raw SQL
     conn = get_connection()
