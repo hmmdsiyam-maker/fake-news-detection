@@ -176,14 +176,14 @@ export const Navbar: React.FC = () => {
                           <div className="flex justify-between items-center">
                             <span className="text-slate-500 dark:text-slate-400">Started</span>
                             <span className="font-mono text-slate-600 dark:text-slate-300">
-                              {new Date(currentUser.subscription_start_date).toLocaleDateString()}
+                              {new Date(currentUser.subscription_start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </div>
                           {currentUser.subscription_end_date && (
                             <div className="flex justify-between items-center">
                               <span className="text-slate-500 dark:text-slate-400">Renews/Expires</span>
                               <span className="font-mono text-slate-600 dark:text-slate-300">
-                                {new Date(currentUser.subscription_end_date).toLocaleDateString()}
+                                {new Date(currentUser.subscription_end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                               </span>
                             </div>
                           )}
