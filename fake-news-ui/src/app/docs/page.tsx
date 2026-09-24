@@ -10,6 +10,7 @@ import {
 import { useApp } from "@/context/AppContext";
 import { Navbar } from "@/components/Navbar";
 import { SiteFooter } from "@/components/SiteFooter";
+import { API_BASE } from "@/lib/api";
 
 export default function DocsPage() {
   const { showToast } = useApp();
@@ -17,7 +18,7 @@ export default function DocsPage() {
   const [copied, setCopied] = useState(false);
 
   const codeSnippets = {
-    curl: `curl -X POST "http://127.0.0.1:8000/api/v1/predict" \\
+    curl: `curl -X POST "${API_BASE}/api/v1/predict" \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
   -d '{
@@ -26,7 +27,7 @@ export default function DocsPage() {
   }'`,
     python: `import requests
 
-url = "http://127.0.0.1:8000/api/v1/predict"
+url = "${API_BASE}/api/v1/predict"
 headers = {
     "Content-Type": "application/json",
     "Authorization": "Bearer YOUR_JWT_TOKEN"
@@ -38,7 +39,7 @@ payload = {
 
 response = requests.post(url, json=payload, headers=headers)
 print(response.json())`,
-    js: `const response = await fetch("http://127.0.0.1:8000/api/v1/predict", {
+    js: `const response = await fetch("${API_BASE}/api/v1/predict", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",

@@ -183,7 +183,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({
           plan_id: planId,
-          success_url: successUrl || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000")
+          success_url: successUrl || (typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000"))
         })
       },
       token

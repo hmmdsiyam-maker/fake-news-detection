@@ -314,6 +314,18 @@ def raw_get_admin_stats():
             """)
             active_res = cur.fetchone()
 
+            # Revenue & Tiers
+            cur.execute("""
+                SELECT 
+                    COUNT(CASE WHEN subscription_tier = 'pro' THEN 1 END) AS pro_users,
+                    COUNT(CASE WHEN subscription_tier = 'enterprise' THEN 1 END) AS enterprise_users
+                FROM users;
+            """)
+            tier_res = cur.fetchone()
+            pro_users = tier_res["pro_users"]
+            enterprise_users = tier_res["enterprise_users"]
+            estimated_mrr = (pro_users * 9.99) + (enterprise_users * 49.99)
+
             return {
                 "total_users": users_res["total_users"],
                 "total_predictions": pred_res["total_predictions"],
@@ -321,7 +333,10 @@ def raw_get_admin_stats():
                 "fake_predictions": pred_res["fake_predictions"],
                 "avg_confidence": float(pred_res["avg_confidence"]),
                 "avg_latency": float(pred_res["avg_latency"]),
-                "active_today": active_res["active_today"]
+                "active_today": active_res["active_today"],
+                "pro_users": pro_users,
+                "enterprise_users": enterprise_users,
+                "estimated_mrr": float(estimated_mrr)
             }
 
 def raw_get_admin_users(search: str = None, role: str = None, tier: str = None):

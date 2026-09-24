@@ -262,102 +262,132 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       {/* Top Admin Header Bar */}
       <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 sm:px-8 h-16 flex items-center justify-between shadow-2xs">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Link
             href="/"
             className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors text-xs font-semibold"
+            title="Back to Site"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Site</span>
+            <ArrowLeft className="w-5 h-5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Back to Site</span>
           </Link>
-          <span className="text-slate-300 dark:text-slate-700">|</span>
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <Shield className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline text-slate-300 dark:text-slate-700">|</span>
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="w-7 h-7 sm:w-7 sm:h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <Shield className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </div>
-            <span className="font-bold text-sm tracking-tight">Admin Dashboard</span>
+            <span className="font-bold text-sm tracking-tight hidden sm:inline">Admin Dashboard</span>
+            <span className="font-bold text-sm tracking-tight sm:hidden">Admin</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={loadDashboardData}
             disabled={loading}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            className="p-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs"
             title="Refresh dashboard data"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
 
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800 text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="font-semibold text-slate-800 dark:text-slate-200">@{currentUser.username}</span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 font-bold">
+          <div className="flex items-center gap-2 pl-1 sm:pl-2 sm:border-l border-slate-200 dark:border-slate-800 text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 hidden sm:block" />
+            <span className="font-semibold text-slate-800 dark:text-slate-200 max-w-[80px] sm:max-w-none truncate">
+              @{currentUser.username}
+            </span>
+            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono uppercase bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 font-bold">
               Admin
             </span>
           </div>
         </div>
       </header>
 
-      {/* Main Admin Content Body */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-8 space-y-6">
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 text-xs overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setActiveTab("overview")}
-            className={`px-4 py-2 rounded-xl font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === "overview"
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Overview &amp; Metrics</span>
+      {/* Main Layout Wrapper */}
+      <div className="flex-1 flex flex-col md:flex-row w-full overflow-hidden relative">
+        
+        {/* Mobile Bottom Nav */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around px-2 pb-safe pt-2 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_10px_rgba(0,0,0,0.2)]">
+          <button onClick={() => setActiveTab("overview")} className={`flex flex-col items-center gap-1 p-2 rounded-xl ${activeTab === "overview" ? "text-indigo-600 dark:text-indigo-400" : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"}`}>
+            <BarChart3 className={`w-5 h-5 ${activeTab === "overview" ? "animate-bounce" : ""}`} />
+            <span className="text-[10px] font-semibold">Overview</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("users")}
-            className={`px-4 py-2 rounded-xl font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === "users"
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>User Accounts ({users.length})</span>
+          <button onClick={() => setActiveTab("users")} className={`flex flex-col items-center gap-1 p-2 rounded-xl ${activeTab === "users" ? "text-indigo-600 dark:text-indigo-400" : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"}`}>
+            <Users className="w-5 h-5" />
+            <span className="text-[10px] font-semibold">Users</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("logs")}
-            className={`px-4 py-2 rounded-xl font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === "logs"
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Verification Logs ({logs.length})</span>
+          <button onClick={() => setActiveTab("logs")} className={`flex flex-col items-center gap-1 p-2 rounded-xl ${activeTab === "logs" ? "text-indigo-600 dark:text-indigo-400" : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"}`}>
+            <FileText className="w-5 h-5" />
+            <span className="text-[10px] font-semibold">Logs</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("articles")}
-            className={`px-4 py-2 rounded-xl font-semibold flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === "articles"
-                ? "bg-indigo-600 text-white shadow-xs"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>Research Articles ({blogs.length})</span>
+          <button onClick={() => setActiveTab("articles")} className={`flex flex-col items-center gap-1 p-2 rounded-xl ${activeTab === "articles" ? "text-indigo-600 dark:text-indigo-400" : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200"}`}>
+            <BookOpen className="w-5 h-5" />
+            <span className="text-[10px] font-semibold">Articles</span>
           </button>
-        </div>
+        </nav>
 
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:flex flex-col w-64 border-r border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 p-4 shrink-0 overflow-y-auto z-10">
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4 px-3">Menu</div>
+            
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-3 transition-all cursor-pointer ${
+                activeTab === "overview"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Overview &amp; Metrics</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("users")}
+              className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-3 transition-all cursor-pointer ${
+                activeTab === "users"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span className="flex-1 text-left">User Accounts</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${activeTab === "users" ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700"}`}>{users.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("logs")}
+              className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-3 transition-all cursor-pointer ${
+                activeTab === "logs"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span className="flex-1 text-left">Verification Logs</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${activeTab === "logs" ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700"}`}>{logs.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("articles")}
+              className={`w-full px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-3 transition-all cursor-pointer ${
+                activeTab === "articles"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span className="flex-1 text-left">Research Articles</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${activeTab === "articles" ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700"}`}>{blogs.length}</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Admin Content Body */}
+        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-6 md:py-8 space-y-6 pb-24 md:pb-8 w-full max-w-full">
         {/* TAB 1: OVERVIEW */}
         {activeTab === "overview" && stats && (
           <div className="space-y-6">
@@ -408,6 +438,29 @@ export default function AdminDashboardPage() {
                   {stats.avg_confidence}%
                 </div>
                 <p className="text-[11px] text-slate-400">Model certainty level</p>
+              </div>
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs space-y-1">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Estimated MRR</div>
+                <div className="text-3xl font-extrabold font-mono text-amber-600 dark:text-amber-400">
+                  ${stats.estimated_mrr?.toFixed(2) || "0.00"}
+                </div>
+                <p className="text-[11px] text-slate-400">Monthly recurring revenue</p>
+              </div>
+              
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs space-y-1">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Pro Subscribers</div>
+                <div className="text-3xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400">
+                  {stats.pro_users || 0}
+                </div>
+                <p className="text-[11px] text-slate-400">Active Pro accounts</p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs space-y-1">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Enterprise Subscribers</div>
+                <div className="text-3xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400">
+                  {stats.enterprise_users || 0}
+                </div>
+                <p className="text-[11px] text-slate-400">Active Enterprise accounts</p>
               </div>
             </div>
 
@@ -543,8 +596,8 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
-              <table className="w-full text-left text-xs">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto bg-white dark:bg-slate-900 shadow-2xs">
+              <table className="w-full text-left text-xs min-w-[700px]">
                 <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
                   <tr>
                     <th className="p-3.5">User</th>
@@ -675,8 +728,8 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
-              <table className="w-full text-left text-xs">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto bg-white dark:bg-slate-900 shadow-2xs">
+              <table className="w-full text-left text-xs min-w-[700px]">
                 <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
                   <tr>
                     <th className="p-3.5">Headline / Content</th>
@@ -774,8 +827,8 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 shadow-2xs">
-              <table className="w-full text-left text-xs">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto bg-white dark:bg-slate-900 shadow-2xs">
+              <table className="w-full text-left text-xs min-w-[700px]">
                 <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
                   <tr>
                     <th className="p-3.5">Title &amp; URL Slug</th>
@@ -854,6 +907,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         )}
+        </main>
       </div>
 
       {/* Write / Edit Article Modal */}

@@ -45,6 +45,9 @@ export interface AdminStats {
   avg_confidence: number;
   avg_latency: number;
   active_today: number;
+  pro_users?: number;
+  enterprise_users?: number;
+  estimated_mrr?: number;
 }
 
 export interface AdminUserItem {
