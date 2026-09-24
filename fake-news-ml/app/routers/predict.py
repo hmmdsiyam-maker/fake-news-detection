@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from app.schemas.predict import PredictRequest, PredictResponse
 from app.auth import get_current_user_optional
-from app.core.config import GUEST_USAGE_LIMIT, DAILY_FREE_LIMIT, guest_usage_tracker
+from app.core.config import GUEST_USAGE_LIMIT, DAILY_FREE_LIMIT, DAILY_PRO_LIMIT, guest_usage_tracker
 from app.core.nlp import run_inference, ml_artifacts
 from app.core.keywords import extract_top_keywords
 from app.core.rate_limit import limiter
@@ -50,18 +50,23 @@ async def predict_news(
     else:
         tier = current_user.get("subscription_tier", "free")
         role = current_user.get("role", "user")
-        is_unlimited = (tier in ["pro", "enterprise"]) or (role == "admin")
+        is_admin = (role == "admin")
+        is_pro = (tier in ["pro", "enterprise"])
 
-        if not is_unlimited:
-            today_count = raw_get_user_today_prediction_count(current_user["id"])
-            if today_count >= DAILY_FREE_LIMIT:
+        today_count = raw_get_user_today_prediction_count(current_user["id"])
+        
+        if is_admin:
+            daily_remaining = -1
+        else:
+            applicable_limit = DAILY_PRO_LIMIT if is_pro else DAILY_FREE_LIMIT
+            
+            if today_count >= applicable_limit:
                 raise HTTPException(
                     status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail=f"Daily limit reached ({DAILY_FREE_LIMIT}/{DAILY_FREE_LIMIT} verifications used today). Upgrade to Pro for unlimited verifications."
+                    detail=f"Daily limit reached ({applicable_limit}/{applicable_limit} verifications used today)." + 
+                           ("" if is_pro else " Upgrade to Pro for 1000 daily verifications.")
                 )
-            daily_remaining = max(0, DAILY_FREE_LIMIT - (today_count + 1))
-        else:
-            daily_remaining = -1
+            daily_remaining = max(0, applicable_limit - (today_count + 1))
 
     raw_content = f"{payload.title or ''} {payload.text or ''}".strip()
     if not raw_content:

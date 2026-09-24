@@ -70,6 +70,33 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
       .catch(() => {});
   }, []);
 
+  // Check for successful Stripe checkout
+  useEffect(() => {
+    if (typeof window !== "undefined" && token) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const checkout = urlParams.get("checkout");
+      const sessionId = urlParams.get("session_id");
+      const planId = urlParams.get("plan_id");
+
+      if (checkout === "success" && sessionId && planId) {
+        showToast("Verifying your subscription...", "info");
+        api.verifySession(sessionId, planId, token)
+          .then((res) => {
+            showToast(res.message || "Successfully upgraded your plan!", "success");
+            refreshUser();
+            window.history.replaceState({}, document.title, window.location.pathname);
+          })
+          .catch((err) => {
+            const msg = err instanceof Error ? err.message : "Failed to verify session";
+            showToast(msg, "error");
+          });
+      } else if (checkout === "cancelled") {
+        showToast("Checkout was cancelled.", "info");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [token, refreshUser, showToast]);
+
   // Fetch User History
   const fetchUserHistory = useCallback(
     async (searchQuery = "", verdictFilter = "") => {

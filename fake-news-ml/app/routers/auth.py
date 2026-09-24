@@ -19,7 +19,7 @@ from app.database import (
     raw_update_last_login,
     raw_get_user_today_prediction_count
 )
-from app.core.config import DAILY_FREE_LIMIT
+from app.core.config import DAILY_FREE_LIMIT, DAILY_PRO_LIMIT
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -100,8 +100,18 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
     today_count = raw_get_user_today_prediction_count(current_user["id"])
     tier = current_user.get("subscription_tier", "free")
     role = current_user.get("role", "user")
-    is_unlimited = (tier in ["pro", "enterprise"]) or (role == "admin")
-    remaining = -1 if is_unlimited else max(0, DAILY_FREE_LIMIT - today_count)
+    is_admin = (role == "admin")
+    is_pro = (tier in ["pro", "enterprise"])
+    
+    if is_admin:
+        remaining = -1
+        limit_display = "unlimited"
+    elif is_pro:
+        remaining = max(0, DAILY_PRO_LIMIT - today_count)
+        limit_display = DAILY_PRO_LIMIT
+    else:
+        remaining = max(0, DAILY_FREE_LIMIT - today_count)
+        limit_display = DAILY_FREE_LIMIT
 
     return {
         "id": current_user["id"],
@@ -111,7 +121,7 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
         "subscription_tier": tier,
         "today_count": today_count,
         "today_prediction_count": today_count,
-        "daily_limit": "unlimited" if is_unlimited else DAILY_FREE_LIMIT,
+        "daily_limit": limit_display,
         "today_remaining": remaining,
         "created_at": current_user["created_at"],
         "last_login": current_user["last_login"]

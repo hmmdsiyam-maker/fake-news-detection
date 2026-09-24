@@ -17,6 +17,7 @@ APP_VERSION = "2.0.0"
 # --- Usage Quota Limits ---
 GUEST_USAGE_LIMIT = int(os.getenv("GUEST_USAGE_LIMIT", "5"))
 DAILY_FREE_LIMIT = int(os.getenv("DAILY_FREE_LIMIT", "100"))
+DAILY_PRO_LIMIT = int(os.getenv("DAILY_PRO_LIMIT", "1000"))
 
 # In-memory guest usage tracker (per client IP)
 guest_usage_tracker = defaultdict(int)
@@ -55,12 +56,12 @@ SUBSCRIPTION_PLANS = [
         "price": 9.99,
         "currency": "usd",
         "interval": "month",
-        "daily_limit": "Unlimited",
+        "daily_limit": 1000,
         "description": "Designed for journalists, researchers, and professional content creators.",
         "badge": "MOST POPULAR",
         "is_popular": True,
         "features": [
-            "Unlimited Daily AI Verifications",
+            "1000 Daily AI Verifications",
             "High-Priority Inference Pipeline (<50ms)",
             "Full Audit History with Re-run & Search",
             "Data Export (CSV & JSON)",
@@ -74,11 +75,11 @@ SUBSCRIPTION_PLANS = [
         "price": 49.99,
         "currency": "usd",
         "interval": "month",
-        "daily_limit": "Unlimited",
+        "daily_limit": 1000,
         "description": "Full-scale fake news mitigation suite for media houses and platforms.",
         "badge": "SCALE",
         "features": [
-            "Everything in Pro for Entire Newsroom",
+            "1000 Daily AI Verifications per Seat",
             "Dedicated REST API Key & Webhooks",
             "Custom Fine-Tuned Domain Models",
             "99.9% High Availability SLA",
