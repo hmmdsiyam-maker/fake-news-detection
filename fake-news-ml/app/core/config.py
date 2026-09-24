@@ -6,6 +6,9 @@ Centralized environment variables, system limits, and runtime settings.
 
 import os
 from collections import defaultdict
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- System & Model Settings ---
 APP_NAME = "AI Fake News Truth Console API"

@@ -172,11 +172,17 @@ export const ConsoleInput: React.FC<ConsoleInputProps> = ({
             {guestPassesLeft} of {GUEST_USAGE_LIMIT} free checks remaining. Sign in for daily quota and saved history.
           </div>
         ) : (
-          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-sans flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5" />
-            <span>
-              Signed in as <strong className="font-semibold">@{currentUser.username}</strong> &bull; Plan:{" "}
-              <strong className="uppercase">{currentUser.subscription_tier || "free"}</strong>
+          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-sans flex flex-col sm:flex-row sm:items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5" />
+              <span>
+                Signed in as <strong className="font-semibold">@{currentUser.username}</strong> &bull; Plan:{" "}
+                <strong className="uppercase">{currentUser.subscription_tier || "free"}</strong>
+              </span>
+            </div>
+            <span className="hidden sm:inline">&bull;</span>
+            <span className="font-medium text-emerald-600 dark:text-emerald-500">
+              Daily Checks Left: {currentUser.today_remaining && currentUser.today_remaining < 0 ? "Unlimited" : currentUser.today_remaining}
             </span>
           </div>
         )}

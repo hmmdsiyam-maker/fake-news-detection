@@ -16,3 +16,5 @@ bcrypt
 pyjwt
 
 slowapi
+
+python-dotenv
