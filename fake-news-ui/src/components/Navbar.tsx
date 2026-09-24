@@ -56,10 +56,10 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md transition-colors duration-200">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-        {/* Brand */}
-        <div className="flex items-center gap-7">
-          <Link href="/" className="flex items-center gap-2.5 group">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[56px] py-2 sm:py-0 flex flex-col sm:flex-row items-center justify-between gap-3">
+        {/* Brand & Mobile Top Row */}
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors border bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 group-hover:border-indigo-300 dark:group-hover:border-indigo-600">
               <Shield className="w-3.5 h-3.5 fill-current" />
             </div>
@@ -87,10 +87,31 @@ export const Navbar: React.FC = () => {
               );
             })}
           </nav>
+          
+          {/* Mobile Actions: Theme & Menu Toggle */}
+          <div className="flex sm:hidden items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTheme(isDark ? "white" : "dark")}
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 cursor-pointer shrink-0"
+              title={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+              aria-label={`Switch to ${isDark ? "Light" : "Dark"} mode`}
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 cursor-pointer shrink-0"
+              aria-label="Toggle menu"
+            >
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Right Section: System Indicator, Theme Switch & User Account */}
-        <div className="flex items-center gap-2.5">
+        <div className="hidden sm:flex items-center justify-center gap-2.5">
           {/* Live Status Indicator */}
           <div
             className="hidden sm:flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-slate-500 dark:text-slate-400"
@@ -122,19 +143,20 @@ export const Navbar: React.FC = () => {
           </button>
 
           {/* User Account / Sign In */}
+          <div>
           {currentUser ? (
             <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2 pl-2.5 pr-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs text-xs font-medium transition-colors cursor-pointer"
+                className="flex items-center gap-2 pl-2.5 pr-2 py-1.5 sm:py-1 min-h-[40px] rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs text-xs font-medium transition-colors cursor-pointer"
               >
-                <div className="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] text-slate-700 dark:text-white font-semibold uppercase">
+                <div className="w-5 h-5 sm:w-4 sm:h-4 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] text-slate-700 dark:text-white font-semibold uppercase shrink-0">
                   {currentUser.username.charAt(0)}
                 </div>
-                <span>{currentUser.username}</span>
+                <span className="truncate max-w-[100px] sm:max-w-none">{currentUser.username}</span>
                 <span
-                  className={`text-[9px] px-1.5 py-0.2 rounded font-mono uppercase ${
+                  className={`text-[9px] px-1.5 py-0.5 sm:py-0.2 rounded font-mono uppercase shrink-0 ${
                     currentUser.subscription_tier !== "free"
                       ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
                       : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
@@ -242,16 +264,7 @@ export const Navbar: React.FC = () => {
               Sign In
             </button>
           )}
-
-          {/* Mobile Menu Toggle */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 cursor-pointer"
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-          </button>
+          </div>
         </div>
       </div>
 
@@ -282,6 +295,73 @@ export const Navbar: React.FC = () => {
                 Admin Dashboard
               </Link>
             )}
+
+            {/* Mobile User Profile Section */}
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+              {currentUser ? (
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex items-center gap-2 px-2 py-1">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-700 dark:text-white font-semibold uppercase shrink-0">
+                      {currentUser.username.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-900 dark:text-slate-100">{currentUser.username}</div>
+                      <div className="text-[10px] text-slate-500">{currentUser.email}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 mt-2 px-2">
+                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex flex-col items-center">
+                      <span className="text-[10px] text-slate-500 uppercase">Plan</span>
+                      <span className={`font-bold text-xs ${currentUser.subscription_tier !== "free" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"}`}>
+                        {currentUser.subscription_tier || "Free"}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex flex-col items-center">
+                      <span className="text-[10px] text-slate-500 uppercase">Remaining</span>
+                      <span className="font-bold text-xs text-indigo-600 dark:text-indigo-400">
+                        {currentUser.today_remaining && currentUser.today_remaining < 0 ? "∞" : currentUser.today_remaining}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      setHistoryModalOpen(true);
+                    }}
+                    className="mt-2 px-3 py-2.5 rounded-lg text-left text-xs font-medium flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                  >
+                    <History className="w-4 h-4 text-slate-400" />
+                    <span>Check History</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      logout();
+                    }}
+                    className="px-3 py-2.5 rounded-lg text-left text-xs font-medium flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setAuthModalOpen(true);
+                  }}
+                  className="w-full px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-xs cursor-pointer text-center"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

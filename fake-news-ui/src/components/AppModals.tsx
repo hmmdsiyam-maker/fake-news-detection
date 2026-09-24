@@ -18,12 +18,14 @@ import { AdminModal } from "@/components/modals/AdminModal";
 import { PricingModal } from "@/components/modals/PricingModal";
 import { QuotaExhaustedModal } from "@/components/modals/QuotaExhaustedModal";
 import { NotificationToast } from "@/components/NotificationToast";
+import { useRouter } from "next/navigation";
 
 interface AppModalsProps {
   onLoadHistoryItem?: (item: HistoryItem) => void;
 }
 
 export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
+  const router = useRouter();
   const {
     isDark,
     token,
@@ -43,7 +45,8 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
     setQuotaModalOpen,
     toast,
     hideToast,
-    showToast
+    showToast,
+    setPendingHistoryLoad
   } = useApp();
 
   // History State
@@ -311,8 +314,11 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
         currentUser={currentUser}
         loading={historyLoading}
         onRestore={(item) => {
-          if (onLoadHistoryItem) onLoadHistoryItem(item);
+          setPendingHistoryLoad(item);
           setHistoryModalOpen(false);
+          if (window.location.pathname !== "/console") {
+            router.push("/console");
+          }
         }}
         onDelete={handleDeleteHistoryItem}
         onClearAll={handleClearHistory}

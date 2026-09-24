@@ -65,7 +65,7 @@ console.log(data);`
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       <Navbar />
 
-      <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+      <main className="flex-1 w-full min-w-0 max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8 sm:space-y-12">
         {/* Header */}
         <div className="space-y-3">
           <div className="text-xs font-semibold uppercase font-mono text-indigo-600 dark:text-indigo-400">
@@ -80,15 +80,15 @@ console.log(data);`
         </div>
 
         {/* Code Snippet Card */}
-        <div className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs transition-colors">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+        <div className="p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-2xs transition-colors w-full overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
             <div className="flex items-center gap-2 text-xs">
               <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">POST</span>
-              <span className="font-mono text-slate-700 dark:text-slate-300 font-semibold">/api/v1/predict</span>
+              <span className="font-mono text-slate-700 dark:text-slate-300 font-semibold break-all">/api/v1/predict</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex rounded-xl bg-slate-100 dark:bg-slate-950 p-0.5 border border-slate-200 dark:border-slate-800 text-xs">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-1 sm:flex-initial rounded-xl bg-slate-100 dark:bg-slate-950 p-0.5 border border-slate-200 dark:border-slate-800 text-xs overflow-x-auto">
                 {(["curl", "python", "js"] as const).map((lang) => (
                   <button
                     key={lang}
@@ -107,15 +107,15 @@ console.log(data);`
               <button
                 type="button"
                 onClick={copyCode}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer shadow-2xs"
+                className="p-2 sm:p-1.5 shrink-0 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer shadow-2xs flex items-center justify-center"
                 title="Copy code"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-4 h-4 sm:w-3.5 sm:h-3.5" />}
               </button>
             </div>
           </div>
 
-          <pre className="p-4 rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 text-xs font-mono text-slate-200 overflow-x-auto leading-relaxed">
+          <pre className="p-4 rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 text-[10px] sm:text-xs font-mono text-slate-200 overflow-x-auto w-full leading-relaxed custom-scrollbar">
             <code>{codeSnippets[activeTab]}</code>
           </pre>
         </div>
@@ -127,7 +127,7 @@ console.log(data);`
             <span>Response Schema</span>
           </h2>
 
-          <div className="p-4 rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-400 overflow-x-auto leading-relaxed">
+          <div className="p-4 rounded-xl bg-slate-900 dark:bg-slate-950 border border-slate-800 text-[10px] sm:text-xs font-mono text-emerald-400 overflow-x-auto w-full leading-relaxed custom-scrollbar">
             <pre>
 {`{
   "prediction": "REAL",
@@ -151,9 +151,10 @@ console.log(data);`
             <span>Available Endpoints</span>
           </h2>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/50 shadow-2xs">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-2xs overflow-hidden">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left text-xs font-mono min-w-[600px]">
+                <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
                 <tr>
                   <th className="p-3.5">Method</th>
                   <th className="p-3.5">Path</th>
@@ -194,6 +195,7 @@ console.log(data);`
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </main>

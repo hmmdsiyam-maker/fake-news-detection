@@ -43,14 +43,14 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
       <div
-        className={`p-6 rounded-2xl border shadow-xs transition-colors duration-200 ${
+        className={`p-4 sm:p-6 rounded-2xl border shadow-xs transition-colors duration-200 ${
           isReal
             ? "border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/60 dark:bg-emerald-950/25"
             : "border-rose-300 dark:border-rose-800/80 bg-rose-50/60 dark:bg-rose-950/25"
         }`}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="w-full sm:w-auto">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] font-mono tracking-wider uppercase font-bold text-slate-500 dark:text-slate-400">
                 Official Verdict
@@ -86,7 +86,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
           </div>
 
           <div
-            className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider border ${
+            className={`w-full sm:w-auto px-3 py-1.5 sm:py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider border text-center ${
               isReal
                 ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
                 : "bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700"
@@ -96,7 +96,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
           </div>
         </div>
 
-        <p className="mt-3 text-xs font-sans leading-relaxed text-slate-700 dark:text-slate-300 max-w-2xl">
+        <p className="mt-4 sm:mt-3 text-sm sm:text-xs font-sans leading-relaxed text-slate-700 dark:text-slate-300 max-w-2xl">
           {isReal
             ? "Article exhibits semantic coherence, verified factual cadence, and lexical distributions conforming to credible journalism."
             : "Article exhibits high-frequency sensationalist markers, exaggerated adjectives, and syntactic cues indicative of disinformation."}
@@ -162,14 +162,14 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
         )}
 
         {/* Tactile Copy Button Strip */}
-        <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
-          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+        <div className="mt-4 pt-4 sm:pt-3 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 text-center sm:text-left">
             Audit Hinge Loss &bull; Calibrated Margins
           </span>
           <button
             type="button"
             onClick={onCopyResult}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            className="w-full sm:w-auto min-h-[44px] sm:min-h-[auto] px-3.5 py-2.5 sm:py-1.5 rounded-lg text-sm sm:text-xs font-mono font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
           >
             {copied ? (
               <>

@@ -93,7 +93,7 @@ export const ConsoleInput: React.FC<ConsoleInputProps> = ({
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Paste or type article headline..."
-          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3.5 py-2.5 text-sm font-sans text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-150"
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 sm:py-3 text-base sm:text-sm font-sans text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-150"
         />
       </div>
 
@@ -113,24 +113,24 @@ export const ConsoleInput: React.FC<ConsoleInputProps> = ({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Paste complete article text or paragraphs here to inspect for fake news and misleading claims..."
-          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3.5 py-3 text-sm font-sans leading-relaxed resize-y min-h-[180px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-150"
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-base sm:text-sm font-sans leading-relaxed resize-y min-h-[140px] sm:min-h-[180px] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-150"
         />
       </div>
 
       {/* Action Controls */}
-      <div className="flex items-center justify-between gap-4 pt-1">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-4 pt-1">
         <button
           type="button"
           onClick={onClear}
           disabled={loading || (!title && !text)}
-          className="px-4 py-2.5 rounded-xl font-medium text-xs flex items-center gap-2 cursor-pointer transition-colors border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Clear</span>
         </button>
 
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] hidden sm:inline text-slate-400 dark:text-slate-500">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <span className="text-[11px] hidden sm:inline text-slate-400 dark:text-slate-500 shrink-0">
             Ctrl + Enter
           </span>
 
@@ -138,7 +138,7 @@ export const ConsoleInput: React.FC<ConsoleInputProps> = ({
             type="button"
             onClick={onAnalyze}
             disabled={loading || (!title && !text)}
-            className="px-6 py-2.5 rounded-xl font-semibold text-xs text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] shadow-sm shadow-indigo-600/30 transition-all duration-150 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto min-h-[44px] px-6 py-2.5 rounded-xl font-semibold text-sm text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] shadow-sm shadow-indigo-600/30 transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

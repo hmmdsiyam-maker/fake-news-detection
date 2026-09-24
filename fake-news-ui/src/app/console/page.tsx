@@ -26,7 +26,9 @@ export default function ConsolePage() {
     setAuthModalOpen,
     setQuotaModalOpen,
     showToast,
-    refreshUser
+    refreshUser,
+    pendingHistoryLoad,
+    setPendingHistoryLoad
   } = useApp();
 
   const [title, setTitle] = useState("");
@@ -36,6 +38,18 @@ export default function ConsolePage() {
   const [latency, setLatency] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Load from history if present
+  React.useEffect(() => {
+    if (pendingHistoryLoad) {
+      setTitle(pendingHistoryLoad.headline || "");
+      setText(pendingHistoryLoad.content || "");
+      setResult(null); // Clear previous results
+      setLatency(null);
+      setErrorMsg(null);
+      setPendingHistoryLoad(null); // Consume the load action
+    }
+  }, [pendingHistoryLoad, setPendingHistoryLoad]);
 
   // Single Random News Selection
   const handleLoadRandomNews = () => {

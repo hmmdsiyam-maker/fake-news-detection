@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { UserProfile } from "@/types";
+import { UserProfile, HistoryItem } from "@/types";
 import { api } from "@/lib/api";
 import { GUEST_USAGE_LIMIT } from "@/constants/presets";
 
@@ -43,6 +43,10 @@ interface AppContextType {
   toast: ToastState;
   showToast: (message: string, type?: "success" | "error" | "info") => void;
   hideToast: () => void;
+
+  // History Load
+  pendingHistoryLoad: HistoryItem | null;
+  setPendingHistoryLoad: (item: HistoryItem | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -60,6 +64,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [quotaModalOpen, setQuotaModalOpen] = useState(false);
+
+  // History Load
+  const [pendingHistoryLoad, setPendingHistoryLoad] = useState<HistoryItem | null>(null);
 
   // Toast
   const [toast, setToast] = useState<ToastState>({
@@ -208,7 +215,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setQuotaModalOpen,
         toast,
         showToast,
-        hideToast
+        hideToast,
+        pendingHistoryLoad,
+        setPendingHistoryLoad
       }}
     >
       {children}

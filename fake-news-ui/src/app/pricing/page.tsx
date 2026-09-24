@@ -165,12 +165,19 @@ export default function PricingPage() {
               <div
                 key={p.id}
                 className={`p-6 rounded-2xl border flex flex-col justify-between transition-colors shadow-2xs ${
-                  p.popular
+                  isCurrent
+                    ? "border-2 border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-md shadow-emerald-500/10 relative"
+                    : p.popular
                     ? "border-2 border-indigo-500 bg-white dark:bg-slate-900 shadow-md shadow-indigo-500/10 relative"
                     : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50"
                 }`}
               >
-                {p.popular && (
+                {isCurrent && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-semibold tracking-wider uppercase shadow-xs flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Active Plan
+                  </div>
+                )}
+                {p.popular && !isCurrent && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-semibold tracking-wider uppercase shadow-xs">
                     Most Popular
                   </div>
@@ -210,7 +217,7 @@ export default function PricingPage() {
                     disabled={isCurrent || loadingPlan !== null}
                     className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       isCurrent
-                        ? "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-default"
+                        ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 cursor-default border border-emerald-200 dark:border-emerald-800/50"
                         : p.popular
                         ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-600/30"
                         : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"

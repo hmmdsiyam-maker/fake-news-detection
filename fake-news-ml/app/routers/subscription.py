@@ -14,7 +14,8 @@ from app.database import raw_update_user_subscription
 from app.core.config import (
     STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET,
-    SUBSCRIPTION_PLANS
+    SUBSCRIPTION_PLANS,
+    FRONTEND_URL
 )
 
 if STRIPE_SECRET_KEY:
@@ -47,7 +48,7 @@ async def create_checkout_session(
     # 1. Real Stripe Integration if API key is provided
     if STRIPE_SECRET_KEY and not STRIPE_SECRET_KEY.startswith("mock"):
         try:
-            domain = payload.success_url or "http://localhost:3000"
+            domain = payload.success_url or FRONTEND_URL
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=["card"],
                 customer_email=current_user["email"],
@@ -86,7 +87,7 @@ async def create_checkout_session(
     # 2. Seamless Sandbox Simulator Mode (Instant testing for development)
     simulated_session_id = f"sim_cs_{int(time.time())}_{current_user['id']}"
     return {
-        "checkout_url": f"http://localhost:3000?session_id={simulated_session_id}&plan_id={plan['id']}&checkout=success",
+        "checkout_url": f"{FRONTEND_URL}?session_id={simulated_session_id}&plan_id={plan['id']}&checkout=success",
         "session_id": simulated_session_id,
         "mode": "simulator",
         "plan": plan,

@@ -114,7 +114,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
 
             <div className="pt-5 mt-4">
               {!currentUser?.subscription_tier || currentUser?.subscription_tier === "free" ? (
-                <div className="w-full py-2.5 rounded-xl font-medium text-xs bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-center">
+                <div className="w-full py-2.5 rounded-xl font-medium text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 text-center">
                   Current Plan
                 </div>
               ) : (
@@ -130,10 +130,16 @@ export const PricingModal: React.FC<PricingModalProps> = ({
           </div>
 
           {/* PLAN 2: PRO VERIFIER (RECOMMENDED) */}
-          <div className="p-5 rounded-2xl border-2 border-indigo-500 bg-indigo-50/50 dark:bg-slate-950/90 shadow-md shadow-indigo-500/10 flex flex-col justify-between relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-semibold tracking-wider uppercase shadow-xs">
-              Recommended
-            </div>
+          <div className={`p-5 rounded-2xl flex flex-col justify-between relative ${currentUser?.subscription_tier === "pro" ? "border-2 border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 shadow-md shadow-emerald-500/10" : "border-2 border-indigo-500 bg-indigo-50/50 dark:bg-slate-950/90 shadow-md shadow-indigo-500/10"}`}>
+            {currentUser?.subscription_tier === "pro" ? (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-semibold tracking-wider uppercase shadow-xs flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Active Plan
+              </div>
+            ) : (
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-semibold tracking-wider uppercase shadow-xs">
+                Recommended
+              </div>
+            )}
 
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between">
