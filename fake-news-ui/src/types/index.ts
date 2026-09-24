@@ -7,6 +7,7 @@ export interface PredictionResult {
   guest_remaining?: number | null;
   daily_remaining?: number | null;
   subscription_tier?: string;
+  top_keywords?: string[];
   status: string;
 }
 
