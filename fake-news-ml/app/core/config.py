@@ -13,7 +13,7 @@ APP_VERSION = "2.0.0"
 
 # --- Usage Quota Limits ---
 GUEST_USAGE_LIMIT = int(os.getenv("GUEST_USAGE_LIMIT", "5"))
-DAILY_FREE_LIMIT = int(os.getenv("DAILY_FREE_LIMIT", "20"))
+DAILY_FREE_LIMIT = int(os.getenv("DAILY_FREE_LIMIT", "100"))
 
 # In-memory guest usage tracker (per client IP)
 guest_usage_tracker = defaultdict(int)
@@ -39,7 +39,7 @@ SUBSCRIPTION_PLANS = [
         "description": "Essential fact-checking tools for everyday casual readers.",
         "badge": "STARTER",
         "features": [
-            "20 Daily AI Verifications (resets every 24h)",
+            "100 Daily AI Verifications (resets every 24h)",
             "PassiveAggressive ML Classifier (96.87% Accuracy)",
             "Personal Search History (Up to 50 items)",
             "Standard Confidence Score Gauge",

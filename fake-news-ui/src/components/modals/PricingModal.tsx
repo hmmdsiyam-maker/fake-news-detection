@@ -95,7 +95,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
               <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span><strong>20 Daily</strong> AI Verifications</span>
+                  <span><strong>100 Daily</strong> AI Verifications</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />

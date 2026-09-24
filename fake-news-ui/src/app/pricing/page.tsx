@@ -22,7 +22,7 @@ export default function PricingPage() {
       period: "forever",
       desc: "For individual readers and occasional claim verification.",
       features: [
-        "20 daily verifications",
+        "100 daily verifications",
         "5 guest evaluations without login",
         "PassiveAggressive ML model",
         "Personal audit history (last 50)",
@@ -99,7 +99,7 @@ export default function PricingPage() {
   };
 
   const featureMatrix = [
-    { feature: "Daily Verification Quota", free: "20 / day", pro: "Unlimited", ent: "Unlimited" },
+    { feature: "Daily Verification Quota", free: "100 / day", pro: "Unlimited", ent: "Unlimited" },
     { feature: "Inference Latency", free: "< 60 ms", pro: "< 35 ms", ent: "< 25 ms (Dedicated)" },
     { feature: "REST API Access", free: "No", pro: "Yes (Personal)", ent: "Yes (Multi-Seat)" },
     { feature: "Raw SQL Audit History", free: "50 records", pro: "Unlimited", ent: "Unlimited + Export" },

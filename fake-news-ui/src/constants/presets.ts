@@ -117,4 +117,4 @@ export const PRESETS = {
 };
 
 export const GUEST_USAGE_LIMIT = 5;
-export const DAILY_FREE_LIMIT = 20;
+export const DAILY_FREE_LIMIT = 100;
