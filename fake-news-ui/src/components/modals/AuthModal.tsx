@@ -173,7 +173,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </form>
 
         <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] font-mono text-slate-500 dark:text-slate-400 text-center">
-          Raw SQL Bcrypt + JWT Auth &bull; PostgreSQL 18
+          Secure Authentication
         </div>
       </div>
     </div>
