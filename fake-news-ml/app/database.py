@@ -99,6 +99,8 @@ def init_db():
             ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(100);
             ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(100);
             ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'active';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_start_date TIMESTAMPTZ;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_end_date TIMESTAMPTZ;
         """)
 
         # Create blog_posts table with Raw SQL
@@ -172,7 +174,7 @@ def raw_get_user_by_email(email: str):
 
 def raw_get_user_by_id(user_id: int):
     query = """
-        SELECT id, username, email, role, subscription_tier, stripe_customer_id, created_at, last_login
+        SELECT id, username, email, role, subscription_tier, stripe_customer_id, subscription_status, subscription_start_date, subscription_end_date, created_at, last_login
         FROM users
         WHERE id = %s;
     """
@@ -208,7 +210,9 @@ def raw_update_user_subscription(user_id: int, tier: str, stripe_customer_id: st
         SET subscription_tier = %s,
             stripe_customer_id = COALESCE(%s, stripe_customer_id),
             stripe_subscription_id = COALESCE(%s, stripe_subscription_id),
-            subscription_status = 'active'
+            subscription_status = 'active',
+            subscription_start_date = CURRENT_TIMESTAMP,
+            subscription_end_date = CURRENT_TIMESTAMP + INTERVAL '30 days'
         WHERE id = %s
         RETURNING id, username, email, role, subscription_tier;
     """

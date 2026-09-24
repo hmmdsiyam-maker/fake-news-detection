@@ -21,6 +21,9 @@ export interface UserProfile {
   today_prediction_count?: number;
   daily_limit?: number | string;
   today_remaining?: number;
+  subscription_start_date?: string | null;
+  subscription_end_date?: string | null;
+  subscription_status?: string | null;
 }
 
 export interface HistoryItem {

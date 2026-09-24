@@ -154,9 +154,9 @@ export const Navbar: React.FC = () => {
                     
                     <div className="mt-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500 dark:text-slate-400">Plan Status</span>
+                        <span className="text-slate-500 dark:text-slate-400">Plan Name</span>
                         <span className={`font-bold uppercase ${currentUser.subscription_tier !== "free" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-600 dark:text-slate-300"}`}>
-                          {currentUser.subscription_tier === "free" ? "Free" : "Active"}
+                          {currentUser.subscription_tier === "pro" ? "Pro Verifier" : currentUser.subscription_tier === "enterprise" ? "Enterprise" : "Free Starter"}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
@@ -169,6 +169,26 @@ export const Navbar: React.FC = () => {
                           {currentUser.today_remaining && currentUser.today_remaining < 0 ? "∞" : currentUser.today_remaining}
                         </span>
                       </div>
+                      
+                      {currentUser.subscription_tier !== "free" && currentUser.subscription_start_date && (
+                        <>
+                          <div className="pt-1.5 mt-1.5 border-t border-slate-200 dark:border-slate-700/50"></div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-500 dark:text-slate-400">Started</span>
+                            <span className="font-mono text-slate-600 dark:text-slate-300">
+                              {new Date(currentUser.subscription_start_date).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {currentUser.subscription_end_date && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500 dark:text-slate-400">Renews/Expires</span>
+                              <span className="font-mono text-slate-600 dark:text-slate-300">
+                                {new Date(currentUser.subscription_end_date).toLocaleDateString()}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
 

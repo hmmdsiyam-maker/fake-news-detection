@@ -124,5 +124,7 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
         "daily_limit": limit_display,
         "today_remaining": remaining,
         "created_at": current_user["created_at"],
-        "last_login": current_user["last_login"]
+        "last_login": current_user["last_login"],
+        "subscription_start_date": current_user.get("subscription_start_date"),
+        "subscription_end_date": current_user.get("subscription_end_date")
     }
