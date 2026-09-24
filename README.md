@@ -1,5 +1,7 @@
 # Fake News Detection - Full-Stack Capstone Project
 
+🚀 **Live Demo:** [https://fake-news-detection-nine-zeta.vercel.app/](https://fake-news-detection-nine-zeta.vercel.app/)
+
 An end-to-end Machine Learning and Natural Language Processing system for real-time fake news classification, featuring a high-performance FastAPI backend and a modern Next.js interactive web dashboard.
 
 ---
