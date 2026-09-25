@@ -22,3 +22,4 @@ class PredictResponse(BaseModel):
     subscription_tier: Optional[str] = "free"
     status: str = "success"
     top_keywords: List[str] = []
+    gemini_analysis: Optional[dict] = None

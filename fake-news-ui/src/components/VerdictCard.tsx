@@ -1,7 +1,15 @@
 "use client";
 
 import React from "react";
-import { Copy, Check, Database, CheckCircle2, AlertTriangle } from "lucide-react";
+import { 
+  Copy, 
+  Check, 
+  Database, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Sparkles,
+  ChevronRight
+} from "lucide-react";
 import { PredictionResult, UserProfile } from "@/types";
 import { GUEST_USAGE_LIMIT } from "@/constants/presets";
 
@@ -32,154 +40,170 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
           AWAITING ARTICLE TELEMETRY
         </div>
         <p className="text-[11px]">
-          Enter an article headline or body text on the left console and click &quot;Analyze Article&quot; to inspect ML classification markers.
+          Enter an article headline or body text on the left console and click &quot;Verify News&quot; to inspect ML classification markers and Gemini AI fact-checking.
         </p>
       </div>
     );
   }
 
   const isReal = result.label === 0;
+  const gemini = result.gemini_analysis;
+  const hasGemini = gemini && gemini.enabled;
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-300">
       <div
-        className={`p-4 sm:p-6 rounded-2xl border shadow-xs transition-colors duration-200 ${
+        className={`p-5 sm:p-6 rounded-2xl border shadow-xs transition-colors duration-200 space-y-4 ${
           isReal
-            ? "border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/60 dark:bg-emerald-950/25"
-            : "border-rose-300 dark:border-rose-800/80 bg-rose-50/60 dark:bg-rose-950/25"
+            ? "border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/40 dark:bg-emerald-950/20"
+            : "border-rose-300 dark:border-rose-800/80 bg-rose-50/40 dark:bg-rose-950/20"
         }`}
       >
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="w-full sm:w-auto">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-mono tracking-wider uppercase font-bold text-slate-500 dark:text-slate-400">
-                Official Verdict
-              </span>
-              {result.saved_to_history && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
-                  <Database className="w-3 h-3" /> Saved to DB
-                </span>
-              )}
-              {!currentUser && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                  Guest: {guestPassesLeft} Remaining
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2.5 mt-1.5">
-              {isReal ? (
-                <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              ) : (
-                <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 shrink-0" />
-              )}
-              <h3
-                className={`text-2xl font-black tracking-tight uppercase font-mono ${
-                  isReal
-                    ? "text-emerald-800 dark:text-emerald-300"
-                    : "text-rose-800 dark:text-rose-300"
-                }`}
-              >
-                {isReal ? "Verified Authentic" : "Fabricated / Fake"}
-              </h3>
-            </div>
-          </div>
-
-          <div
-            className={`w-full sm:w-auto px-3 py-1.5 sm:py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider border text-center ${
-              isReal
-                ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
-                : "bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700"
-            }`}
-          >
-            {result.confidence.toFixed(1)}% Match
-          </div>
-        </div>
-
-        <p className="mt-4 sm:mt-3 text-sm sm:text-xs font-sans leading-relaxed text-slate-700 dark:text-slate-300 max-w-2xl">
-          {isReal
-            ? "Article exhibits semantic coherence, verified factual cadence, and lexical distributions conforming to credible journalism."
-            : "Article exhibits high-frequency sensationalist markers, exaggerated adjectives, and syntactic cues indicative of disinformation."}
-        </p>
-
-        {/* Metrics Strip */}
-        <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800/80 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 shadow-2xs">
-            <div className="text-[10px] font-mono font-semibold uppercase text-slate-500 dark:text-slate-400">
-              Confidence Score
-            </div>
+        {/* Header: Status + Match Badge */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800">
+          <div className="flex items-center gap-3">
             <div
-              className={`text-lg font-bold font-mono mt-0.5 ${
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                 isReal
-                  ? "text-emerald-700 dark:text-emerald-400"
-                  : "text-rose-700 dark:text-rose-400"
+                  ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400"
+                  : "bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400"
               }`}
             >
-              {result.confidence.toFixed(2)}%
+              {isReal ? (
+                <CheckCircle2 className="w-6 h-6" />
+              ) : (
+                <AlertTriangle className="w-6 h-6" />
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3
+                  className={`text-xl sm:text-2xl font-black uppercase font-mono tracking-tight ${
+                    isReal
+                      ? "text-emerald-800 dark:text-emerald-300"
+                      : "text-rose-800 dark:text-rose-300"
+                  }`}
+                >
+                  {isReal ? "Verified Authentic" : "Fabricated / Fake"}
+                </h3>
+                {result.saved_to_history && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
+                    <Database className="w-3 h-3" /> Saved
+                  </span>
+                )}
+                {!currentUser && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                    Guest: {guestPassesLeft} left
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400 font-mono">
+                <span>Confidence: <strong className="text-slate-800 dark:text-slate-200">{result.confidence.toFixed(1)}%</strong></span>
+                <span>&bull;</span>
+                <span>Latency: <strong className="text-slate-800 dark:text-slate-200">{latency ? `${latency}ms` : "25ms"}</strong></span>
+              </div>
             </div>
           </div>
 
-          <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 shadow-2xs">
-            <div className="text-[10px] font-mono font-semibold uppercase text-slate-500 dark:text-slate-400">
-              Inference Latency
-            </div>
-            <div className="text-lg font-bold font-mono mt-0.5 text-indigo-700 dark:text-indigo-400">
-              {latency ? `${latency} ms` : "< 25 ms"}
-            </div>
-          </div>
-
-          <div className="col-span-2 sm:col-span-1 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 shadow-2xs flex flex-col justify-between">
-            <div className="text-[10px] font-mono font-semibold uppercase text-slate-500 dark:text-slate-400">
-              Model Engine
-            </div>
-            <div className="text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 truncate">
-              PassiveAggressive (80k)
-            </div>
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            {hasGemini && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
+                <Sparkles className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                Gemini Verified
+              </span>
+            )}
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider border ${
+                isReal
+                  ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
+                  : "bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700"
+              }`}
+            >
+              {result.confidence.toFixed(1)}% Match
+            </span>
           </div>
         </div>
 
-        {/* Top Keywords Strip */}
+        {/* Fact-Check Analysis (From Gemini or Clean Summary) */}
+        <div className="space-y-3">
+          <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+            <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              {hasGemini ? (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  Gemini Fact-Check Breakdown
+                </>
+              ) : (
+                "Linguistic Forensic Verdict"
+              )}
+            </div>
+            <p className="text-sm font-sans leading-relaxed text-slate-800 dark:text-slate-200">
+              {hasGemini && gemini.summary
+                ? gemini.summary
+                : isReal
+                ? "This article exhibits high lexical consistency, realistic datelines, and structural cadence typical of verified journalism."
+                : "This article exhibits sensationalist syntax, unverified attribution patterns, and linguistic markers common to fabricated disinformation."}
+            </p>
+          </div>
+
+          {/* Key Investigative Signals (Compact bullet points) */}
+          {hasGemini && gemini.key_points && gemini.key_points.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
+                Key Investigative Signals
+              </div>
+              <div className="grid grid-cols-1 gap-1.5">
+                {gemini.key_points.map((point, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-2 p-2.5 rounded-lg bg-white/60 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800/70 text-xs text-slate-700 dark:text-slate-300"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
+                    <span className="leading-snug">{point}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Signal Keywords (Clean inline pills) */}
         {result.top_keywords && result.top_keywords.length > 0 && (
-          <div className="mt-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/40">
-            <div className="text-[10px] font-mono font-semibold uppercase text-slate-500 dark:text-slate-400 mb-2">
-              Extracted Signal Keywords
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {result.top_keywords.map((kw, i) => (
-                <span
-                  key={i}
-                  className={`px-2 py-1 rounded-md text-xs font-medium border ${
-                    isReal
-                      ? "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300"
-                      : "bg-rose-50 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300"
-                  }`}
-                >
-                  {kw}
-                </span>
-              ))}
-            </div>
+          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+            <span className="text-[10px] font-mono font-semibold uppercase text-slate-500 dark:text-slate-400 mr-1">
+              Signals:
+            </span>
+            {result.top_keywords.slice(0, 8).map((kw, i) => (
+              <span
+                key={i}
+                className="px-2 py-0.5 rounded text-[11px] font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+              >
+                {kw}
+              </span>
+            ))}
           </div>
         )}
 
-        {/* Tactile Copy Button Strip */}
-        <div className="mt-4 pt-4 sm:pt-3 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 text-center sm:text-left">
-            Audit Hinge Loss &bull; Calibrated Margins
+        {/* Bottom Actions */}
+        <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+            Model: PassiveAggressive (80k) {hasGemini ? "+ Gemini" : ""}
           </span>
+
           <button
             type="button"
             onClick={onCopyResult}
-            className="w-full sm:w-auto min-h-[44px] sm:min-h-[auto] px-3.5 py-2.5 sm:py-1.5 rounded-lg text-sm sm:text-xs font-mono font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
           >
             {copied ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span className="text-emerald-700 dark:text-emerald-300">Copied!</span>
+                <span className="text-emerald-700 dark:text-emerald-300">Copied</span>
               </>
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5 text-slate-400" />
-                <span>Copy Audit Report</span>
+                <span>Copy Report</span>
               </>
             )}
           </button>

@@ -9,6 +9,11 @@ from collections import defaultdict
 from dotenv import load_dotenv
 
 load_dotenv()
+# Also check frontend and root .env for GEMINI_API_KEY
+if not os.getenv("GEMINI_API_KEY"):
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", "..", "fake-news-ui", ".env"))
+if not os.getenv("GEMINI_API_KEY"):
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env"))
 
 # --- System & Model Settings ---
 APP_NAME = "AI Fake News Truth Console API"
@@ -31,6 +36,10 @@ JWT_EXPIRATION_SECONDS = 60 * 60 * 24 * 7  # 7 days
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+# --- Google Gemini AI Configuration ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 # --- Subscription Plans Definition ---
 SUBSCRIPTION_PLANS = [

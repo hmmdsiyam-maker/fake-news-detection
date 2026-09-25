@@ -17,6 +17,7 @@ from app.database import (
     raw_get_user_today_prediction_count,
     raw_save_history
 )
+from app.services.gemini_service import analyze_with_gemini
 
 router = APIRouter(prefix="/api/v1", tags=["Inference"])
 
@@ -117,6 +118,18 @@ async def predict_news(
     except Exception:
         top_keywords = []
 
+    # Deep Fact-Checking & Forensics via Google Gemini
+    gemini_analysis = None
+    try:
+        gemini_analysis = analyze_with_gemini(
+            title=payload.title or "",
+            text=payload.text or "",
+            ml_prediction=prediction_label,
+            ml_confidence=confidence
+        )
+    except Exception as e:
+        print(f"[!] Gemini analysis error: {e}")
+
     return PredictResponse(
         prediction=prediction_label,
         label=pred,
@@ -127,5 +140,6 @@ async def predict_news(
         daily_remaining=daily_remaining,
         subscription_tier=tier,
         status="success",
-        top_keywords=top_keywords
+        top_keywords=top_keywords,
+        gemini_analysis=gemini_analysis
     )

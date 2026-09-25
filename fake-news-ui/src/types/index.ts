@@ -8,7 +8,17 @@ export interface PredictionResult {
   daily_remaining?: number | null;
   subscription_tier?: string;
   top_keywords?: string[];
+  gemini_analysis?: GeminiAnalysis | null;
   status: string;
+}
+
+export interface GeminiAnalysis {
+  enabled: boolean;
+  verdict?: string | null;
+  summary?: string | null;
+  key_points?: string[];
+  model_used?: string | null;
+  error?: string | null;
 }
 
 export interface UserProfile {

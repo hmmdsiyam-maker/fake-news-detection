@@ -14,7 +14,6 @@ stripe
 psycopg
 bcrypt
 pyjwt
-
 slowapi
-
 python-dotenv
+google-genai
