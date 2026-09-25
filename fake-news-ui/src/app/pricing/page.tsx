@@ -112,7 +112,7 @@ export default function PricingPage() {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       <Navbar />
 
-      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-16">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-12 sm:space-y-16">
         {/* Header */}
         <div className="space-y-3 text-center max-w-2xl mx-auto">
           <div className="text-xs font-semibold uppercase font-mono text-indigo-600 dark:text-indigo-400">
@@ -241,9 +241,14 @@ export default function PricingPage() {
 
         {/* Feature Comparison */}
         <div className="space-y-3">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Tier Comparison Matrix</h2>
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900/50 shadow-2xs">
-            <table className="w-full text-left text-xs">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Tier Comparison Matrix</h2>
+            <span className="sm:hidden text-[10px] font-mono text-slate-400 dark:text-slate-500">
+              Scroll &rarr;
+            </span>
+          </div>
+          <div className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto bg-white dark:bg-slate-900/50 shadow-2xs">
+            <table className="w-full min-w-[520px] text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
                 <tr>
                   <th className="p-3.5">Specification</th>
