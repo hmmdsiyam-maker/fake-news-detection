@@ -40,7 +40,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
           AWAITING ARTICLE TELEMETRY
         </div>
         <p className="text-[11px]">
-          Enter an article headline or body text on the left console and click &quot;Verify News&quot; to inspect ML classification markers and Gemini AI fact-checking.
+          Enter an article headline or body text on the left console and click &quot;Verify News&quot; to inspect ML classification markers and AI fact-checking.
         </p>
       </div>
     );
@@ -109,7 +109,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
             {hasGemini && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
                 <Sparkles className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
-                Gemini Verified
+                AI Verified
               </span>
             )}
             <span
@@ -124,14 +124,14 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
           </div>
         </div>
 
-        {/* Fact-Check Analysis (From Gemini or Clean Summary) */}
+        {/* Fact-Check Analysis (From AI or Clean Summary) */}
         <div className="space-y-3">
           <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
             <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
               {hasGemini ? (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                  Gemini Fact-Check Breakdown
+                  Forensic Fact-Check Breakdown
                 </>
               ) : (
                 "Linguistic Forensic Verdict"
@@ -187,7 +187,7 @@ export const VerdictCard: React.FC<VerdictCardProps> = ({
         {/* Bottom Actions */}
         <div className="pt-3 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3">
           <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
-            Model: PassiveAggressive (80k) {hasGemini ? "+ Gemini" : ""}
+            Model: PassiveAggressive (80k) {hasGemini ? "+ Neural LLM" : ""}
           </span>
 
           <button
