@@ -126,6 +126,23 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_blog_created ON blog_posts(created_at DESC);
         """)
 
+        # Create payments table with Raw SQL
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS payments (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                plan_id VARCHAR(50) NOT NULL,
+                amount NUMERIC(10, 2) NOT NULL,
+                currency VARCHAR(10) NOT NULL DEFAULT 'usd',
+                status VARCHAR(50) NOT NULL DEFAULT 'completed',
+                payment_method VARCHAR(50) NOT NULL DEFAULT 'card',
+                stripe_session_id VARCHAR(255),
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_payments_user_date ON payments(user_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+        """)
+
         conn.commit()
 
     conn.close()
@@ -203,18 +220,27 @@ def raw_get_user_today_prediction_count(user_id: int) -> int:
             row = cur.fetchone()
             return int(row["today_count"]) if row and row["today_count"] else 0
 
-def raw_update_user_subscription(user_id: int, tier: str, stripe_customer_id: str = None, stripe_subscription_id: str = None):
-    """Upgrade or modify a user's subscription tier."""
-    query = """
+def raw_update_user_subscription(
+    user_id: int,
+    tier: str,
+    stripe_customer_id: str = None,
+    stripe_subscription_id: str = None,
+    billing_cycle: str = "monthly"
+):
+    """Upgrade or modify a user's subscription tier with cycle-accurate expiration."""
+    is_annual = billing_cycle and billing_cycle.lower() in ["annual", "yearly"]
+    interval_sql = "INTERVAL '365 days'" if is_annual else "INTERVAL '30 days'"
+
+    query = f"""
         UPDATE users
         SET subscription_tier = %s,
             stripe_customer_id = COALESCE(%s, stripe_customer_id),
             stripe_subscription_id = COALESCE(%s, stripe_subscription_id),
             subscription_status = 'active',
             subscription_start_date = CURRENT_TIMESTAMP,
-            subscription_end_date = CURRENT_TIMESTAMP + INTERVAL '30 days'
+            subscription_end_date = CURRENT_TIMESTAMP + {interval_sql}
         WHERE id = %s
-        RETURNING id, username, email, role, subscription_tier;
+        RETURNING id, username, email, role, subscription_tier, subscription_start_date, subscription_end_date;
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -326,6 +352,15 @@ def raw_get_admin_stats():
             enterprise_users = tier_res["enterprise_users"]
             estimated_mrr = (pro_users * 9.99) + (enterprise_users * 49.99)
 
+            # Actual payments total revenue
+            cur.execute("""
+                SELECT 
+                    COUNT(*) AS total_payments,
+                    COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END), 0) AS total_revenue
+                FROM payments;
+            """)
+            pay_res = cur.fetchone() or {"total_payments": 0, "total_revenue": 0}
+
             return {
                 "total_users": users_res["total_users"],
                 "total_predictions": pred_res["total_predictions"],
@@ -336,7 +371,9 @@ def raw_get_admin_stats():
                 "active_today": active_res["active_today"],
                 "pro_users": pro_users,
                 "enterprise_users": enterprise_users,
-                "estimated_mrr": float(estimated_mrr)
+                "estimated_mrr": float(estimated_mrr),
+                "total_revenue": float(pay_res["total_revenue"]),
+                "total_payments": int(pay_res["total_payments"])
             }
 
 def raw_get_admin_users(search: str = None, role: str = None, tier: str = None):
@@ -427,6 +464,111 @@ def raw_delete_user_by_admin(user_id: int):
             res = cur.fetchone()
             conn.commit()
             return res is not None
+
+# ==============================================================================
+# PAYMENTS RAW SQL CRUD OPERATIONS
+# ==============================================================================
+
+def raw_record_payment(
+    user_id: int | None,
+    plan_id: str,
+    amount: float,
+    currency: str = "usd",
+    status: str = "completed",
+    payment_method: str = "card",
+    stripe_session_id: str = None
+):
+    """Insert a new payment transaction record with Raw SQL."""
+    query = """
+        INSERT INTO payments (
+            user_id, plan_id, amount, currency, status, payment_method, stripe_session_id
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id, user_id, plan_id, amount, currency, status, payment_method, stripe_session_id, created_at;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (user_id, plan_id, amount, currency, status, payment_method, stripe_session_id))
+            rec = cur.fetchone()
+            conn.commit()
+            return rec
+
+def raw_get_admin_payments(
+    search: str = None,
+    status_filter: str = None,
+    plan_filter: str = None,
+    limit: int = 100,
+    offset: int = 0
+):
+    """Retrieve payments list with Raw SQL joined with users and filtered."""
+    conditions = []
+    params = []
+
+    if search and search.strip():
+        term = f"%{search.strip().lower()}%"
+        conditions.append("(LOWER(COALESCE(u.username, '')) LIKE %s OR LOWER(COALESCE(u.email, '')) LIKE %s OR LOWER(COALESCE(p.stripe_session_id, '')) LIKE %s)")
+        params.extend([term, term, term])
+
+    if status_filter and status_filter.strip() and status_filter.lower() != "all":
+        conditions.append("LOWER(p.status) = %s")
+        params.append(status_filter.strip().lower())
+
+    if plan_filter and plan_filter.strip() and plan_filter.lower() != "all":
+        conditions.append("LOWER(p.plan_id) = %s")
+        params.append(plan_filter.strip().lower())
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    query = f"""
+        SELECT 
+            p.id,
+            p.user_id,
+            u.username,
+            u.email,
+            p.plan_id,
+            p.amount,
+            p.currency,
+            p.status,
+            p.payment_method,
+            p.stripe_session_id,
+            p.created_at
+        FROM payments p
+        LEFT JOIN users u ON p.user_id = u.id
+        {where_clause}
+        ORDER BY p.created_at DESC
+        LIMIT %s OFFSET %s;
+    """
+    params.extend([limit, offset])
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, tuple(params))
+            return cur.fetchall()
+
+def raw_get_admin_payment_stats():
+    """Aggregate total revenue, transaction counts, and averages via Raw SQL."""
+    query = """
+        SELECT
+            COUNT(*) AS total_transactions,
+            COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END), 0) AS total_revenue,
+            COUNT(CASE WHEN status = 'completed' THEN 1 END) AS successful_count,
+            COUNT(CASE WHEN status = 'refunded' THEN 1 END) AS refunded_count,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending_count,
+            COALESCE(ROUND(AVG(CASE WHEN status = 'completed' THEN amount END), 2), 0) AS avg_transaction_value
+        FROM payments;
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            res = cur.fetchone() or {}
+            return {
+                "total_transactions": res.get("total_transactions", 0),
+                "total_revenue": float(res.get("total_revenue", 0.0)),
+                "successful_count": res.get("successful_count", 0),
+                "refunded_count": res.get("refunded_count", 0),
+                "pending_count": res.get("pending_count", 0),
+                "avg_transaction_value": float(res.get("avg_transaction_value", 0.0))
+            }
 
 # ==============================================================================
 # BLOG RAW SQL CRUD OPERATIONS

@@ -11,7 +11,9 @@ from app.database import (
     raw_get_admin_stats,
     raw_get_admin_users,
     raw_get_admin_global_history,
-    raw_delete_user_by_admin
+    raw_delete_user_by_admin,
+    raw_get_admin_payments,
+    raw_get_admin_payment_stats
 )
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin Panel"])
@@ -44,6 +46,31 @@ async def get_admin_global_history(
     """Global system audit log of all predictions with search and verdict filtering."""
     logs = raw_get_admin_global_history(search=q, verdict=verdict, limit=limit, offset=offset)
     return {"logs": logs, "count": len(logs)}
+
+@router.get("/payments")
+async def get_admin_payments_list(
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    plan: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    admin_user: dict = Depends(require_admin)
+):
+    """List financial payment transactions with search, status & plan filtering (Raw SQL)."""
+    payments = raw_get_admin_payments(
+        search=q,
+        status_filter=status,
+        plan_filter=plan,
+        limit=limit,
+        offset=offset
+    )
+    return {"payments": payments, "count": len(payments)}
+
+@router.get("/payments/stats")
+async def get_admin_payment_metrics(admin_user: dict = Depends(require_admin)):
+    """Aggregate financial metrics and transaction revenue totals (Raw SQL)."""
+    stats = raw_get_admin_payment_stats()
+    return stats
 
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: int, admin_user: dict = Depends(require_admin)):

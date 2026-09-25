@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import confetti from "canvas-confetti";
-import { Sparkles } from "lucide-react";
 
 import { PredictionResult } from "@/types";
 import { getRandomSample, GUEST_USAGE_LIMIT, DAILY_FREE_LIMIT } from "@/constants/presets";
@@ -32,7 +31,6 @@ export default function ConsolePage() {
   } = useApp();
 
   const [title, setTitle] = useState("");
-  const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
@@ -42,8 +40,7 @@ export default function ConsolePage() {
   // Load from history if present
   React.useEffect(() => {
     if (pendingHistoryLoad) {
-      setTitle(pendingHistoryLoad.headline || "");
-      setText(pendingHistoryLoad.content_preview || "");
+      setTitle(pendingHistoryLoad.headline || pendingHistoryLoad.content_preview || "");
       setResult(null); // Clear previous results
       setLatency(null);
       setErrorMsg(null);
@@ -51,17 +48,17 @@ export default function ConsolePage() {
     }
   }, [pendingHistoryLoad, setPendingHistoryLoad]);
 
-  // Single Random News Selection
+  // Load Random News Headline
   const handleLoadRandomNews = () => {
-    const preset = getRandomSample(title);
-    setTitle(preset.title);
-    setText(preset.text);
+    const sample = getRandomSample(title);
+    setTitle(sample.title);
+    setResult(null);
+    setLatency(null);
     setErrorMsg(null);
   };
 
   const handleClear = () => {
     setTitle("");
-    setText("");
     setResult(null);
     setLatency(null);
     setErrorMsg(null);
@@ -69,8 +66,8 @@ export default function ConsolePage() {
 
   // Run Inference Analysis
   const handleAnalyze = async () => {
-    if (!title.trim() && !text.trim()) {
-      setErrorMsg("Please enter a headline or article text to check.");
+    if (!title.trim()) {
+      setErrorMsg("Please enter a headline, claim, or news statement to verify.");
       return;
     }
 
@@ -96,7 +93,7 @@ export default function ConsolePage() {
     const start = performance.now();
 
     try {
-      const data = await api.predict(title, text, token);
+      const data = await api.predict(title, "", token);
       const elapsed = Math.round(performance.now() - start);
 
       setResult(data);
@@ -155,53 +152,38 @@ export default function ConsolePage() {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       <Navbar />
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
-        {/* Workspace Title & Controls */}
-        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              News Verifier
-            </h1>
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-              Check news articles and headlines with AI in real-time.
-            </p>
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={handleLoadRandomNews}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-700 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              title="Load a random news sample to test"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Random News ↻</span>
-            </button>
-          </div>
+      <main className="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        {/* Workspace Title */}
+        <div className="mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-slate-200 dark:border-slate-800">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            News Verifier
+          </h1>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+            Check news statements, articles, and claims with AI in real-time.
+          </p>
         </div>
 
         {/* Clean Workbench Chassis */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/40 shadow-xs transition-colors overflow-hidden">
           {/* Subheader */}
-          <div className="px-6 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-950/70 flex items-center justify-between text-xs">
+          <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-950/70 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 text-[11px] text-slate-700 dark:text-slate-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>AI Model: PassiveAggressive Classifier (Fast Online Learning)</span>
+              <span className="sm:hidden font-medium">AI Model: PassiveAggressive (NLP)</span>
+              <span className="hidden sm:inline">AI Model: PassiveAggressive Classifier (Fast Online Learning)</span>
             </div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              Sub-second response
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+              Sub-second
             </div>
           </div>
 
-          <div className="p-6 sm:p-7 space-y-6">
+          <div className="p-3.5 sm:p-7 space-y-4 sm:space-y-6">
             {/* Split: Form (Left) & Dial (Right) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-start">
               <div className="lg:col-span-7">
                 <ConsoleInput
                   title={title}
                   setTitle={setTitle}
-                  text={text}
-                  setText={setText}
                   loading={loading}
                   errorMsg={errorMsg}
                   currentUser={currentUser}
@@ -221,7 +203,7 @@ export default function ConsolePage() {
                 />
 
                 {/* Diagnostics Panel */}
-                <div className="w-full mt-4 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-xs text-xs space-y-2.5">
+                <div className="w-full mt-3 sm:mt-4 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-xs text-xs space-y-2">
                   <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800/80">
                     <span className="text-slate-500 dark:text-slate-400">Response Time:</span>
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">

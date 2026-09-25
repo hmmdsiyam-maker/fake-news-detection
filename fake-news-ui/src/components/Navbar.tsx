@@ -58,7 +58,7 @@ export const Navbar: React.FC = () => {
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800/80 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md transition-colors duration-200">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[56px] py-2 sm:py-0 flex flex-col sm:flex-row items-center justify-between gap-3">
         {/* Brand & Mobile Top Row */}
-        <div className="flex items-center justify-between w-full sm:w-auto">
+        <div className="flex items-center justify-between w-full sm:w-auto sm:gap-8 md:gap-10">
           <Link href="/" className="flex items-center gap-2.5 group shrink-0">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors border bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 group-hover:border-indigo-300 dark:group-hover:border-indigo-600">
               <Shield className="w-3.5 h-3.5 fill-current" />
@@ -69,7 +69,7 @@ export const Navbar: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1.5 md:ml-2">
             {navLinks.map((item) => {
               const isActive = pathname === item.href;
               return (

@@ -5,6 +5,7 @@ import {
   AdminStats,
   AdminUserItem,
   AdminGlobalLog,
+  AdminPaymentItem,
   SubscriptionPlan
 } from "@/types";
 
@@ -166,23 +167,49 @@ export const api = {
     );
   },
 
+  getAdminPayments: async (
+    token: string,
+    params: { q?: string; status?: string; plan?: string; limit?: number; offset?: number } = {}
+  ) => {
+    const query = new URLSearchParams();
+    if (params.q) query.append("q", params.q);
+    if (params.status && params.status !== "all") query.append("status", params.status);
+    if (params.plan && params.plan !== "all") query.append("plan", params.plan);
+    query.append("limit", String(params.limit || 100));
+    query.append("offset", String(params.offset || 0));
+
+    return fetchClient<{ payments: AdminPaymentItem[]; count: number }>(
+      `/api/v1/admin/payments?${query.toString()}`,
+      {},
+      token
+    );
+  },
+
   // Subscription
   getPlans: async () => {
     return fetchClient<{ plans: SubscriptionPlan[] }>("/api/v1/subscription/plans");
   },
 
-  createCheckoutSession: async (planId: string, token: string, successUrl?: string) => {
+  createCheckoutSession: async (
+    planId: string,
+    token: string,
+    successUrl?: string,
+    billingCycle: string = "monthly"
+  ) => {
     return fetchClient<{
       checkout_url: string;
       session_id: string;
       mode: string;
       plan: SubscriptionPlan;
+      billing_cycle?: string;
+      total_charged?: number;
     }>(
       "/api/v1/subscription/create-checkout-session",
       {
         method: "POST",
         body: JSON.stringify({
           plan_id: planId,
+          billing_cycle: billingCycle,
           success_url: successUrl || (typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000"))
         })
       },
@@ -190,7 +217,12 @@ export const api = {
     );
   },
 
-  verifySession: async (sessionId: string, planId: string, token: string) => {
+  verifySession: async (
+    sessionId: string,
+    planId: string,
+    token: string,
+    billingCycle: string = "monthly"
+  ) => {
     return fetchClient<{
       status: string;
       message: string;
@@ -201,7 +233,7 @@ export const api = {
       "/api/v1/subscription/verify-session",
       {
         method: "POST",
-        body: JSON.stringify({ session_id: sessionId, plan_id: planId })
+        body: JSON.stringify({ session_id: sessionId, plan_id: planId, billing_cycle: billingCycle })
       },
       token
     );

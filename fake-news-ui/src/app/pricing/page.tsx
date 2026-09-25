@@ -86,7 +86,7 @@ export default function PricingPage() {
     setLoadingPlan(planId);
     try {
       showToast(`Redirecting to Secure Checkout...`, "info");
-      const res = await api.createCheckoutSession(planId, token);
+      const res = await api.createCheckoutSession(planId, token, undefined, billingCycle);
       if (res.checkout_url) {
         window.location.href = res.checkout_url;
       }
@@ -195,9 +195,16 @@ export default function PricingPage() {
 
                   <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{p.desc}</p>
 
-                  <div className="flex items-baseline gap-1 pt-1">
-                    <span className="text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100">{price}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">/{p.period}</span>
+                  <div className="space-y-0.5 pt-1">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-slate-100">{price}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">/{p.period}</span>
+                    </div>
+                    {billingCycle === "annual" && p.id !== "free" && (
+                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium font-mono">
+                        Billed annually: {p.id === "pro" ? "$95.88 / yr" : "$479.88 / yr"}
+                      </div>
+                    )}
                   </div>
 
                   <ul className="space-y-2.5 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">

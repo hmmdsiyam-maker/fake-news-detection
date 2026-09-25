@@ -19,7 +19,7 @@ interface PricingModalProps {
   currentUser: UserProfile | null;
   checkoutLoading: boolean;
   isDark?: boolean;
-  onUpgradePlan: (planId: string) => void;
+  onUpgradePlan: (planId: string, billingCycle?: string) => void;
   onCancelSubscription: () => void;
 }
 
@@ -32,6 +32,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   onUpgradePlan,
   onCancelSubscription
 }) => {
+  const [billingCycle, setBillingCycle] = React.useState<"monthly" | "annual">("monthly");
   if (!isOpen) return null;
 
   return (
@@ -61,6 +62,35 @@ export const PricingModal: React.FC<PricingModalProps> = ({
             <div className="text-xs text-slate-500 dark:text-slate-400">
               Upgrade your truth verification quota &bull; Cancel anytime
             </div>
+          </div>
+        </div>
+
+        {/* Billing Switch */}
+        <div className="flex items-center justify-center pt-4">
+          <div className="flex items-center p-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/60 text-xs">
+            <button
+              type="button"
+              onClick={() => setBillingCycle("monthly")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                billingCycle === "monthly"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-800 dark:text-slate-100 font-semibold"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setBillingCycle("annual")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+                billingCycle === "annual"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-800 dark:text-slate-100 font-semibold"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              <span>Annual</span>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">Save 20%</span>
+            </button>
           </div>
         </div>
 
@@ -154,9 +184,15 @@ export const PricingModal: React.FC<PricingModalProps> = ({
               </div>
               <div>
                 <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  $9.99 <span className="text-xs font-normal text-slate-500 dark:text-slate-400 font-sans">/ month</span>
+                  {billingCycle === "annual" ? "$7.99" : "$9.99"} <span className="text-xs font-normal text-slate-500 dark:text-slate-400 font-sans">/ month</span>
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">For journalists, analysts, and researchers.</p>
+                {billingCycle === "annual" ? (
+                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-medium mt-0.5">
+                    $95.88 billed annually (Save $24)
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">For journalists, analysts, and researchers.</p>
+                )}
               </div>
 
               <div className="pt-3 border-t border-indigo-200 dark:border-slate-800 space-y-2 text-xs">
@@ -188,7 +224,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                 <button
                   type="button"
                   disabled={checkoutLoading}
-                  onClick={() => onUpgradePlan("pro")}
+                  onClick={() => onUpgradePlan("pro", billingCycle)}
                   className="w-full py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-600/30 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                 >
                   {checkoutLoading ? (
@@ -199,7 +235,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                   ) : (
                     <>
                       <Zap className="w-3.5 h-3.5 fill-current" />
-                      <span>Upgrade to Pro ($9.99)</span>
+                      <span>Upgrade to Pro ({billingCycle === "annual" ? "$95.88/yr" : "$9.99/mo"})</span>
                     </>
                   )}
                 </button>
@@ -228,9 +264,15 @@ export const PricingModal: React.FC<PricingModalProps> = ({
               </div>
               <div>
                 <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  $49.99 <span className="text-xs font-normal text-slate-500 dark:text-slate-400 font-sans">/ month</span>
+                  {billingCycle === "annual" ? "$39.99" : "$49.99"} <span className="text-xs font-normal text-slate-500 dark:text-slate-400 font-sans">/ month</span>
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">For digital newsrooms and editorial teams.</p>
+                {billingCycle === "annual" ? (
+                  <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-medium mt-0.5">
+                    $479.88 billed annually (Save $120)
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">For digital newsrooms and editorial teams.</p>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2 text-xs">
@@ -262,11 +304,11 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                 <button
                   type="button"
                   disabled={checkoutLoading}
-                  onClick={() => onUpgradePlan("enterprise")}
+                  onClick={() => onUpgradePlan("enterprise", billingCycle)}
                   className="w-full py-2.5 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-slate-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Crown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  <span>Deploy Enterprise</span>
+                  <span>Deploy Enterprise ({billingCycle === "annual" ? "$479.88/yr" : "$49.99/mo"})</span>
                 </button>
               )}
             </div>

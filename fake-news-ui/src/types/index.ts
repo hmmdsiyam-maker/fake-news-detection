@@ -48,6 +48,22 @@ export interface AdminStats {
   pro_users?: number;
   enterprise_users?: number;
   estimated_mrr?: number;
+  total_revenue?: number;
+  total_payments?: number;
+}
+
+export interface AdminPaymentItem {
+  id: number;
+  user_id: number | null;
+  username?: string | null;
+  email?: string | null;
+  plan_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  payment_method: string;
+  stripe_session_id?: string | null;
+  created_at: string;
 }
 
 export interface AdminUserItem {

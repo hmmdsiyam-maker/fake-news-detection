@@ -110,18 +110,29 @@ def run_inference(title: str, text: str) -> Tuple[str, int, float, int]:
     cleaned_content = preprocess_text(raw_content) or raw_content.lower()
     tfidf_features = vectorizer.transform([cleaned_content])
 
-    # Classify
-    pred = int(model.predict(tfidf_features)[0])
+    # Classify & Length-adaptive Intercept Calibration
+    tokens = cleaned_content.split()
+    token_count = len(tokens)
 
-    # Calibrate Confidence
     if hasattr(model, "decision_function"):
         margin = float(model.decision_function(tfidf_features)[0])
+        # For short headline-only inputs (< 25 words), the intercept of +0.9794 (trained on 500-word articles)
+        # artificially forces authentic short headlines into the 'Fake News' class.
+        # Scale the intercept for short inputs to give fair weight to word features.
+        if token_count < 25 and hasattr(model, "intercept_"):
+            raw_dot = margin - float(model.intercept_[0])
+            effective_intercept = float(model.intercept_[0]) * min(1.0, token_count / 25.0) * 0.4
+            margin = raw_dot + effective_intercept
+
+        pred = 1 if margin > 0 else 0
         prob_fake = 1.0 / (1.0 + math.exp(-max(min(margin, 20.0), -20.0)))
         confidence = round((prob_fake if pred == 1 else (1.0 - prob_fake)) * 100.0, 2)
     elif hasattr(model, "predict_proba"):
         probs = model.predict_proba(tfidf_features)[0]
+        pred = int(model.predict(tfidf_features)[0])
         confidence = round(float(probs[pred]) * 100.0, 2)
     else:
+        pred = int(model.predict(tfidf_features)[0])
         confidence = 95.0
 
     confidence = max(confidence, 50.0)

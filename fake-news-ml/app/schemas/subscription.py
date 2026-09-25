@@ -9,9 +9,11 @@ from typing import Optional
 
 class CreateCheckoutRequest(BaseModel):
     plan_id: str
+    billing_cycle: Optional[str] = "monthly"
     success_url: Optional[str] = None
     cancel_url: Optional[str] = None
 
 class VerifySessionRequest(BaseModel):
     session_id: str
     plan_id: str
+    billing_cycle: Optional[str] = "monthly"

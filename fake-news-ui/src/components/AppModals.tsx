@@ -8,6 +8,7 @@ import {
   AdminStats,
   AdminUserItem,
   AdminGlobalLog,
+  AdminPaymentItem,
   SubscriptionPlan,
   BlogPost
 } from "@/types";
@@ -58,6 +59,7 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
   const [adminUsers, setAdminUsers] = useState<AdminUserItem[]>([]);
   const [adminLogs, setAdminLogs] = useState<AdminGlobalLog[]>([]);
   const [adminBlogs, setAdminBlogs] = useState<BlogPost[]>([]);
+  const [adminPayments, setAdminPayments] = useState<AdminPaymentItem[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
 
   // Plans State
@@ -80,10 +82,11 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
       const checkout = urlParams.get("checkout");
       const sessionId = urlParams.get("session_id");
       const planId = urlParams.get("plan_id");
+      const cycle = urlParams.get("cycle") || "monthly";
 
       if (checkout === "success" && sessionId && planId) {
         showToast("Verifying your subscription...", "info");
-        api.verifySession(sessionId, planId, token)
+        api.verifySession(sessionId, planId, token, cycle)
           .then((res) => {
             showToast(res.message || "Successfully upgraded your plan!", "success");
             refreshUser();
@@ -163,6 +166,27 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
     }
   }, []);
 
+  const fetchAdminPayments = useCallback(
+    async (paymentSearch = "", statusFilter = "all", planFilter = "all") => {
+      const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("truth-console-token") : null);
+      if (!activeToken) return;
+
+      try {
+        const paymentsRes = await api.getAdminPayments(activeToken, {
+          q: paymentSearch,
+          status: statusFilter,
+          plan: planFilter,
+          limit: 100,
+          offset: 0
+        });
+        setAdminPayments(paymentsRes.payments || []);
+      } catch {
+        // ignore
+      }
+    },
+    [token]
+  );
+
   const fetchAdminData = useCallback(
     async (userSearch = "", roleFilter = "all", tierFilter = "all", logSearch = "", verdictFilter = "all") => {
       const activeToken = token || (typeof window !== "undefined" ? localStorage.getItem("truth-console-token") : null);
@@ -170,14 +194,18 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
 
       setAdminLoading(true);
       try {
-        const [stats, usersRes, logsRes] = await Promise.all([
+        const [stats, usersRes, logsRes, paymentsRes] = await Promise.all([
           api.getAdminStats(activeToken),
           api.getAdminUsers(activeToken, { q: userSearch, role: roleFilter, tier: tierFilter }),
-          api.getAdminGlobalLogs(activeToken, { q: logSearch, verdict: verdictFilter, limit: 50, offset: 0 })
+          api.getAdminGlobalLogs(activeToken, { q: logSearch, verdict: verdictFilter, limit: 50, offset: 0 }),
+          api.getAdminPayments(activeToken, { limit: 100, offset: 0 }).catch(() => ({ payments: [] }))
         ]);
         setAdminStats(stats);
         setAdminUsers(usersRes.users || []);
         setAdminLogs(logsRes.logs || []);
+        if (paymentsRes && paymentsRes.payments) {
+          setAdminPayments(paymentsRes.payments);
+        }
         fetchAdminBlogs();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Failed to fetch admin telemetry";
@@ -250,7 +278,7 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
   };
 
   // Stripe Checkout
-  const handleUpgradePlan = async (planId: string) => {
+  const handleUpgradePlan = async (planId: string, billingCycle: string = "monthly") => {
     if (!token || !currentUser) {
       setPricingModalOpen(false);
       setAuthModalOpen(true);
@@ -260,9 +288,9 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
 
     setCheckoutLoading(true);
     try {
-      const res = await api.createCheckoutSession(planId, token);
+      const res = await api.createCheckoutSession(planId, token, undefined, billingCycle);
       if (res.checkout_url) {
-        showToast(`Redirecting to Stripe Checkout for ${planId}...`, "info");
+        showToast(`Redirecting to Stripe Checkout for ${planId} (${billingCycle})...`, "info");
         window.location.href = res.checkout_url;
       } else {
         showToast(`Successfully updated plan!`, "success");
@@ -334,10 +362,12 @@ export const AppModals: React.FC<AppModalsProps> = ({ onLoadHistoryItem }) => {
         users={adminUsers}
         logs={adminLogs}
         blogs={adminBlogs}
+        payments={adminPayments}
         loading={adminLoading}
         onRefresh={() => fetchAdminData()}
         onSearchUsers={(q: string, r?: string, t?: string) => fetchAdminData(q, r || "all", t || "all")}
         onSearchLogs={(q: string, v?: string) => fetchAdminData("", "all", "all", q, v || "all")}
+        onSearchPayments={(q: string, s?: string, p?: string) => fetchAdminPayments(q, s || "all", p || "all")}
         onDeleteUser={handleDeleteUserByAdmin}
         onSaveBlog={handleSaveBlog}
         onDeleteBlog={handleDeleteBlog}
